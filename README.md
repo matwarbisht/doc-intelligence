@@ -47,4 +47,5 @@ Stage 1 focuses on a complete upload-to-cited-answer vertical slice. Authenticat
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Design system](docs/design-system.md)
 - [Repository structure](docs/repository-structure.md)

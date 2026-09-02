@@ -43,13 +43,16 @@ apps/web/
 │   │   ├── App.tsx             # Top-level routes and application shell
 │   │   ├── App.test.tsx        # Application smoke test
 │   │   └── providers.tsx       # Router, query client, and future providers
+│   ├── components/             # Button, Input, and Card primitives
 │   ├── pages/
 │   │   ├── HomePage.tsx
-│   │   └── NotFoundPage.tsx
+│   │   ├── NotFoundPage.tsx
+│   │   └── StyleGuide/         # Design-system playground
+│   ├── styles/                 # Global styles and design tokens
 │   ├── test/
 │   │   └── setup.ts            # Shared Vitest setup
+│   ├── theme/                  # Light, dark, and system theme utility
 │   ├── main.tsx                # Browser entry point
-│   └── styles.css              # Temporary foundation styles
 ├── eslint.config.js
 ├── index.html
 ├── package.json

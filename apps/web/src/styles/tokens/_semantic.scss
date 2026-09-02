@@ -1,0 +1,61 @@
+:root {
+  /* Page */
+  --color-background: var(--color-neutral-1);
+  --color-foreground: var(--color-neutral-12);
+
+  /* Surfaces */
+  --color-surface: var(--color-neutral-2);
+  --color-surface-hover: var(--color-neutral-3);
+  --color-surface-active: var(--color-neutral-4);
+  --color-card: var(--color-surface);
+  --color-card-foreground: var(--color-text-primary);
+
+  /* Text */
+  --color-text-primary: var(--color-neutral-12);
+  --color-text-secondary: var(--color-neutral-11);
+  --color-text-muted: var(--color-neutral-10);
+
+  /* Borders */
+  --color-border: var(--color-neutral-6);
+  --color-border-hover: var(--color-neutral-7);
+  --color-border-strong: var(--color-neutral-8);
+
+  /* Primary / brand action */
+  --color-primary: var(--color-brand-9);
+  --color-primary-hover: var(--color-brand-10);
+  --color-primary-subtle: var(--color-brand-3);
+  --color-primary-foreground: var(--color-neutral-12);
+
+  /* Secondary action */
+  --color-secondary: var(--color-neutral-3);
+  --color-secondary-hover: var(--color-neutral-4);
+  --color-secondary-foreground: var(--color-neutral-12);
+
+  /* Input */
+  --color-input-background: var(--color-neutral-2);
+  --color-input-border: var(--color-border);
+  --color-input-border-hover: var(--color-border-hover);
+
+  /* Destructive */
+  --color-danger: var(--color-danger-11);
+  --color-danger-hover: var(--color-danger-12);
+  --color-danger-subtle: var(--color-danger-3);
+  --color-danger-foreground: white;
+
+  /* Success */
+  --color-success: var(--color-success-9);
+  --color-success-subtle: var(--color-success-3);
+  --color-success-foreground: var(--color-success-12);
+
+  /* Focus and overlay */
+  --color-focus-ring: var(--color-brand-8);
+  --color-overlay: rgb(0 0 0 / 0.5);
+}
+
+html.dark {
+  /* Bright solid colors need dark foregrounds in dark mode. */
+  --color-primary-foreground: var(--color-neutral-1);
+  --color-danger: var(--color-danger-11);
+  --color-danger-hover: var(--color-danger-10);
+  --color-danger-foreground: var(--color-neutral-1);
+}

@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@doc-intelligence/api-client": "workspace:*",
+    "@fontsource/inter": "^5.3.0",
+    "@radix-ui/colors": "^3.0.0",
     "@tanstack/react-query": "^5.85.5",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
@@ -30,6 +32,7 @@
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.3.0",
     "jsdom": "^26.1.0",
+    "sass": "^1.103.1",
     "typescript": "~5.9.2",
     "typescript-eslint": "^8.41.0",
     "vite": "^7.1.3",

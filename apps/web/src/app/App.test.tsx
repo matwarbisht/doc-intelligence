@@ -17,4 +17,19 @@ describe('App', () => {
       }),
     ).toBeVisible();
   });
+
+  it('exposes the design-system playground', () => {
+    render(
+      <MemoryRouter initialEntries={['/style-guide']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole('heading', { name: /warm, restrained foundations/i }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('group', { name: /theme preference/i }),
+    ).toBeVisible();
+  });
 });
