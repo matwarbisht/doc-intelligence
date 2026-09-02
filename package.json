@@ -1,0 +1,30 @@
+{
+  "name": "doc-intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,magenta \"pnpm dev:web\" \"pnpm dev:api\"",
+    "dev:web": "pnpm --filter @doc-intelligence/web dev",
+    "dev:api": "cd apps/api && uv run uvicorn app.main:app --reload",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint && cd apps/api && uv run ruff check .",
+    "typecheck": "pnpm -r typecheck && cd apps/api && uv run pyright",
+    "test": "pnpm -r test && cd apps/api && uv run pytest",
+    "format": "prettier --write . && cd apps/api && uv run ruff format .",
+    "format:check": "pnpm format:check:web && cd apps/api && uv run ruff format --check .",
+    "format:check:web": "prettier --check ."
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prettier": "^3.6.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
