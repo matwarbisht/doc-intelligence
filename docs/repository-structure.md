@@ -13,12 +13,15 @@ doc-intelligence/
 │
 ├── supabase/
 │   ├── migrations/             # Database migrations
+│   ├── seed.sql                # Synthetic local development data
 │   └── config.toml             # Local Supabase configuration
 │
 ├── docs/                       # Architecture and engineering documentation
 ├── examples/                   # Safe example document corpus
 ├── scripts/
-│   └── dev.sh                  # One-command local server launcher
+│   ├── dev.sh                  # One-command local server launcher
+│   ├── supabase.sh             # Project-pinned local Supabase launcher
+│   └── uv.sh                   # Portable uv command resolver
 ├── .github/workflows/          # Continuous integration
 ├── .env.example                # Environment-variable template
 ├── Makefile                    # Common development commands
@@ -84,6 +87,13 @@ apps/api/
 │   │   └── router.py           # API router composition
 │   ├── core/
 │   │   └── config.py           # Validated application settings
+│   ├── db/
+│   │   └── pool.py             # asyncpg pool and database codecs
+│   ├── domain/
+│   │   └── models.py           # Infrastructure-independent domain models
+│   ├── repositories/
+│   │   ├── document_repository.py          # Persistence protocol
+│   │   └── postgres_document_repository.py # Postgres adapter
 │   ├── schemas/
 │   │   └── health.py           # HTTP response schema
 │   └── main.py                 # FastAPI application entry point
@@ -108,10 +118,8 @@ As functionality is added, the backend will gain focused directories such as:
 
 ```text
 app/
-├── domain/                     # Application-owned entities and interfaces
 ├── services/                   # Use-case orchestration
-├── providers/                  # Gemini and Unstructured adapters
-└── repositories/               # Database persistence adapters
+└── providers/                  # Gemini and Unstructured adapters
 ```
 
 These directories should be introduced when they contain real functionality rather than pre-created as empty architecture.
@@ -167,7 +175,7 @@ The API client must not contain backend business logic, database models, provide
 
 This directory owns local Supabase configuration and version-controlled SQL migrations.
 
-Phase 1 will add migrations for documents, document versions, processing jobs, canonical elements, chunks, extraction runs, entities, mentions, facts, and vector support.
+Phase 1 adds migrations for documents, document versions, processing jobs, canonical elements, chunks, extraction runs, entities, mentions, facts, relationships, queries, and vector support. See [Database Model](database.md).
 
 Large original document files will live in Supabase Storage rather than Postgres.
 

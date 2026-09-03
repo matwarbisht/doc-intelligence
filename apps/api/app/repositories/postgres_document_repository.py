@@ -1,0 +1,102 @@
+"""asyncpg implementation of the document repository."""
+
+from typing import cast
+from uuid import UUID
+
+import asyncpg
+
+from app.domain import Document, DocumentStatus, DocumentVersion, NewDocument
+
+
+class PostgresDocumentRepository:
+    def __init__(self, pool: asyncpg.Pool) -> None:
+        self._pool = pool
+
+    async def create(self, document: NewDocument) -> Document:
+        row = await self._pool.fetchrow(
+            """
+            insert into public.documents (
+                filename, mime_type, storage_path, content_hash, metadata
+            ) values ($1, $2, $3, $4, $5)
+            returning *
+            """,
+            document.filename,
+            document.mime_type,
+            document.storage_path,
+            document.content_hash,
+            document.metadata,
+        )
+        if row is None:
+            raise RuntimeError("database did not return the created document")
+        return self._to_document(row)
+
+    async def get(self, document_id: UUID) -> Document | None:
+        row = await self._pool.fetchrow(
+            "select * from public.documents where id = $1",
+            document_id,
+        )
+        return None if row is None else self._to_document(row)
+
+    async def list(self, *, limit: int = 50, offset: int = 0) -> list[Document]:
+        if limit < 1 or limit > 100:
+            raise ValueError("limit must be between 1 and 100")
+        if offset < 0:
+            raise ValueError("offset cannot be negative")
+
+        rows = await self._pool.fetch(
+            """
+            select * from public.documents
+            order by created_at desc, id desc
+            limit $1 offset $2
+            """,
+            limit,
+            offset,
+        )
+        return [self._to_document(row) for row in rows]
+
+    async def update_status(self, document_id: UUID, status: DocumentStatus) -> Document | None:
+        row = await self._pool.fetchrow(
+            """
+            update public.documents
+            set status = $2
+            where id = $1
+            returning *
+            """,
+            document_id,
+            status.value,
+        )
+        return None if row is None else self._to_document(row)
+
+    async def create_version(
+        self,
+        document_id: UUID,
+        *,
+        parser_provider: str | None = None,
+        parser_version: str | None = None,
+    ) -> DocumentVersion:
+        async with self._pool.acquire() as connection, connection.transaction():
+            await connection.execute(
+                "select pg_advisory_xact_lock(hashtextextended($1::text, 0))",
+                document_id,
+            )
+            row = await connection.fetchrow(
+                """
+                insert into public.document_versions (
+                    document_id, version, parser_provider, parser_version
+                )
+                select $1, coalesce(max(version), 0) + 1, $2, $3
+                from public.document_versions
+                where document_id = $1
+                returning *
+                """,
+                document_id,
+                parser_provider,
+                parser_version,
+            )
+        if row is None:
+            raise RuntimeError("database did not return the created document version")
+        return DocumentVersion.model_validate(dict(row))
+
+    @staticmethod
+    def _to_document(row: asyncpg.Record) -> Document:
+        return Document.model_validate(cast(object, dict(row)))

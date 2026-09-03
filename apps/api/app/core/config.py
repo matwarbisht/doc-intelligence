@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    database_url: str | None = None
 
     @field_validator("cors_origins", mode="before")
     @classmethod

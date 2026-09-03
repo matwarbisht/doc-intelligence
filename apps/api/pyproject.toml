@@ -4,16 +4,20 @@ version = "0.1.0"
 description = "Document Intelligence HTTP API"
 requires-python = ">=3.12"
 dependencies = [
+    "asyncpg>=0.30,<1",
     "fastapi>=0.116.1,<1",
+    "pgvector>=0.4,<1",
     "pydantic-settings>=2.10.1,<3",
     "uvicorn[standard]>=0.35.0,<1",
 ]
 
 [dependency-groups]
 dev = [
+    "asyncpg-stubs>=0.30,<1",
     "httpx>=0.28.1,<1",
     "pyright>=1.1.404,<2",
     "pytest>=8.4.1,<9",
+    "pytest-asyncio>=1,<2",
     "ruff>=0.12.11,<1",
 ]
 
@@ -22,6 +26,10 @@ package = false
 
 [tool.pytest.ini_options]
 addopts = "-q"
+asyncio_mode = "auto"
+markers = [
+    "integration: tests that require an external Postgres database",
+]
 pythonpath = ["."]
 testpaths = ["tests"]
 

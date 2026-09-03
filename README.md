@@ -46,6 +46,8 @@ Stage 1 focuses on a complete upload-to-cited-answer vertical slice. Authenticat
 
 ## Documentation
 
+- [Stage 1 implementation plan](docs/implementation-plan.md)
 - [Architecture](docs/architecture.md)
+- [Database model](docs/database.md)
 - [Design system](docs/design-system.md)
 - [Repository structure](docs/repository-structure.md)
