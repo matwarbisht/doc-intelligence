@@ -1,4 +1,4 @@
-.PHONY: install dev dev-web dev-api db-start db-stop db-status db-reset db-test db-verify build test lint typecheck format check clean
+.PHONY: install dev dev-local dev-web dev-api db-start db-stop db-status db-reset db-test db-test-upload db-verify build test lint typecheck format check clean
 
 install:
 	pnpm install
@@ -6,6 +6,9 @@ install:
 
 dev:
 	./scripts/dev.sh
+
+dev-local:
+	./scripts/dev-local.sh
 
 dev-web:
 	pnpm dev:web
@@ -28,7 +31,10 @@ db-reset:
 db-test:
 	cd apps/api && TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres ../../scripts/uv.sh run pytest -m integration
 
-db-verify: db-reset db-test
+db-test-upload:
+	./scripts/test-local-upload.sh
+
+db-verify: db-reset db-test-upload
 
 build:
 	pnpm build

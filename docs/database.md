@@ -66,6 +66,7 @@ make db-start     # Start local Supabase and apply migrations/seeds
 make db-status    # Show local service URLs and credentials
 make db-reset     # Recreate the database from migrations and seed.sql
 make db-test      # Run integration tests against local Postgres
+make db-test-upload # Exercise real local Storage and queued persistence
 make db-verify    # Reset from scratch, then run integration tests
 make db-stop      # Stop local Supabase while retaining its data
 ```

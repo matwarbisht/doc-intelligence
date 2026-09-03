@@ -25,7 +25,7 @@ async def _configure_connection(connection: asyncpg.Connection) -> None:
         decoder=_decode_json,
         format="text",
     )
-    await register_vector(connection)
+    await register_vector(connection, schema="extensions")
 
 
 async def create_database_pool(database_url: str) -> asyncpg.Pool:

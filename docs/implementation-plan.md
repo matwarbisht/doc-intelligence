@@ -20,7 +20,7 @@ The Stage 1 MVP is delivered as a sequence of small, verifiable milestones. Each
 - Add the repository boundary and Postgres adapter.
 - Cover domain and migration contracts with automated tests.
 
-## Phase 2 — Local platform and persistence validation
+## Phase 2 — Local platform and persistence validation (complete)
 
 The goal is a reproducible local data environment before building product workflows.
 
@@ -36,7 +36,7 @@ The goal is a reproducible local data environment before building product workfl
 
 Phase 2 is complete when a fresh checkout can start Supabase, rebuild the schema, load safe seed data, and pass the integration test without using the hosted project.
 
-## Phase 3 — Upload and document lifecycle
+## Phase 3 — Upload and document lifecycle (complete)
 
 - Build the upload and document-list API endpoints.
 - Store originals in the private document bucket.

@@ -27,9 +27,16 @@ cp .env.example .env
 make dev
 ```
 
-The frontend runs at <http://localhost:5173>, the API at <http://localhost:8000>, and API documentation at <http://localhost:8000/docs>.
+The frontend runs at <http://localhost:5173>, the API at <http://localhost:8000>, and API documentation at <http://localhost:8000/docs>. Local development also accepts the equivalent `127.0.0.1` frontend origin.
 
 `make dev` starts both applications, detects uv in its standard user installation location, and supports pnpm installed through Volta or Corepack. Press `Ctrl+C` once to stop both servers.
+
+For the complete local product workflow, start Supabase and inject its local credentials without writing them to `.env`:
+
+```bash
+make db-start
+make dev-local
+```
 
 ## Commands
 
@@ -49,5 +56,6 @@ Stage 1 focuses on a complete upload-to-cited-answer vertical slice. Authenticat
 - [Stage 1 implementation plan](docs/implementation-plan.md)
 - [Architecture](docs/architecture.md)
 - [Database model](docs/database.md)
+- [Document upload and lifecycle](docs/document-lifecycle.md)
 - [Design system](docs/design-system.md)
 - [Repository structure](docs/repository-structure.md)

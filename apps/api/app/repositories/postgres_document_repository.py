@@ -6,6 +6,7 @@ from uuid import UUID
 import asyncpg
 
 from app.domain import Document, DocumentStatus, DocumentVersion, NewDocument
+from app.repositories.document_repository import DuplicateDocumentError
 
 
 class PostgresDocumentRepository:
@@ -36,6 +37,63 @@ class PostgresDocumentRepository:
             document_id,
         )
         return None if row is None else self._to_document(row)
+
+    async def get_by_content_hash(self, content_hash: str) -> Document | None:
+        row = await self._pool.fetchrow(
+            "select * from public.documents where content_hash = $1",
+            content_hash,
+        )
+        return None if row is None else self._to_document(row)
+
+    async def create_queued(self, document: NewDocument) -> Document:
+        try:
+            async with self._pool.acquire() as connection, connection.transaction():
+                row = await connection.fetchrow(
+                    """
+                    insert into public.documents (
+                        filename, mime_type, storage_path, content_hash, metadata
+                    ) values ($1, $2, $3, $4, $5)
+                    returning *
+                    """,
+                    document.filename,
+                    document.mime_type,
+                    document.storage_path,
+                    document.content_hash,
+                    document.metadata,
+                )
+                if row is None:
+                    raise RuntimeError("database did not return the created document")
+
+                version_id = await connection.fetchval(
+                    """
+                    insert into public.document_versions (document_id, version)
+                    values ($1, 1)
+                    returning id
+                    """,
+                    row["id"],
+                )
+                await connection.execute(
+                    """
+                    insert into public.processing_jobs (document_version_id, stage, status)
+                    values ($1, 'queued', 'pending')
+                    """,
+                    version_id,
+                )
+                queued_row = await connection.fetchrow(
+                    """
+                    update public.documents
+                    set status = 'queued'
+                    where id = $1
+                    returning *
+                    """,
+                    row["id"],
+                )
+        except asyncpg.UniqueViolationError as error:
+            raise DuplicateDocumentError from error
+
+        if queued_row is None:
+            raise RuntimeError("database did not return the queued document")
+        return self._to_document(queued_row)
 
     async def list(self, *, limit: int = 50, offset: int = 0) -> list[Document]:
         if limit < 1 or limit > 100:

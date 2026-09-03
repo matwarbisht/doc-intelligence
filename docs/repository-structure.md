@@ -20,7 +20,9 @@ doc-intelligence/
 ├── examples/                   # Safe example document corpus
 ├── scripts/
 │   ├── dev.sh                  # One-command local server launcher
+│   ├── dev-local.sh            # Local Supabase-aware app launcher
 │   ├── supabase.sh             # Project-pinned local Supabase launcher
+│   ├── test-local-upload.sh     # Storage and lifecycle integration test
 │   └── uv.sh                   # Portable uv command resolver
 ├── .github/workflows/          # Continuous integration
 ├── .env.example                # Environment-variable template
@@ -91,9 +93,11 @@ apps/api/
 │   │   └── pool.py             # asyncpg pool and database codecs
 │   ├── domain/
 │   │   └── models.py           # Infrastructure-independent domain models
+│   ├── providers/              # Private Storage and future AI adapters
 │   ├── repositories/
 │   │   ├── document_repository.py          # Persistence protocol
 │   │   └── postgres_document_repository.py # Postgres adapter
+│   ├── services/               # Upload and lifecycle orchestration
 │   ├── schemas/
 │   │   └── health.py           # HTTP response schema
 │   └── main.py                 # FastAPI application entry point
@@ -114,15 +118,17 @@ The backend is responsible for:
 - executing retrieval and RAG workflows; and
 - enforcing security and application rules.
 
-As functionality is added, the backend will gain focused directories such as:
+The current backend boundaries are:
 
 ```text
 app/
+├── domain/                     # Infrastructure-independent models
 ├── services/                   # Use-case orchestration
-└── providers/                  # Gemini and Unstructured adapters
+├── providers/                  # Storage and future AI adapters
+└── repositories/               # Persistence boundaries and adapters
 ```
 
-These directories should be introduced when they contain real functionality rather than pre-created as empty architecture.
+New boundaries should still be introduced only when they contain real functionality rather than as empty architecture.
 
 ## Internal packages
 

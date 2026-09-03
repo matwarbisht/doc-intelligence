@@ -20,8 +20,8 @@ export function HomePage() {
             facts, and answers grounded in source evidence.
           </p>
           <div className={styles.actions}>
-            <Link className={styles.primaryLink} to="/style-guide">
-              Explore the system
+            <Link className={styles.primaryLink} to="/documents">
+              Open document library
             </Link>
             <a className={styles.secondaryLink} href={`${apiBaseUrl}/docs`}>
               API documentation

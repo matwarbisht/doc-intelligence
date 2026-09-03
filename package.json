@@ -22,10 +22,5 @@
     "concurrently": "^9.2.1",
     "prettier": "^3.6.2",
     "supabase": "^2.116.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
   }
 }
