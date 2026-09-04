@@ -54,7 +54,7 @@ The frontend polls active documents and provides a detail page where extracted f
 
 ```bash
 GEMINI_API_KEY=replace-with-your-key
-GEMINI_EXTRACTION_MODEL=gemini-2.5-flash
+GEMINI_EXTRACTION_MODEL=gemini-3.6-flash
 GEMINI_EMBEDDING_MODEL=gemini-embedding-001
 GEMINI_EMBEDDING_DIMENSION=768
 GEMINI_TIMEOUT_SECONDS=120

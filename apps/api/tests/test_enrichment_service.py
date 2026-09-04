@@ -56,6 +56,9 @@ class FakeEmbeddings:
     async def embed(self, chunks):  # type: ignore[no-untyped-def]
         return tuple(ChunkVector(chunk_id=chunk.id, values=(1.0, 0.0, 0.0)) for chunk in chunks)
 
+    async def embed_query(self, query: str) -> tuple[float, ...]:
+        return (1.0, 0.0, 0.0)
+
 
 class FakeEnrichmentRepository:
     def __init__(self, extraction: EnrichmentClaim, embedding: EmbeddingClaim) -> None:

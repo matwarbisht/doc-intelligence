@@ -188,7 +188,7 @@ This directory owns local Supabase configuration and version-controlled SQL migr
 
 Phase 1 adds migrations for documents, document versions, processing jobs, canonical elements, chunks, extraction runs, entities, mentions, facts, relationships, queries, and vector support. See [Database Model](database.md).
 
-Large original document files live in Supabase Storage rather than Postgres. Canonical elements and provenance-aware chunks produced by Phase 4 live in Postgres. Phase 5 adds versioned Gemini extraction results, evidence-linked semantic records, and provider/model-specific chunk embeddings.
+Large original document files live in Supabase Storage rather than Postgres. Canonical elements and provenance-aware chunks produced by Phase 4 live in Postgres. Phase 5 adds versioned Gemini extraction results, evidence-linked semantic records, and provider/model-specific chunk embeddings. Phase 6 adds hybrid corpus retrieval, grounded answer generation, validated citations, and query history.
 
 ### `examples/`
 

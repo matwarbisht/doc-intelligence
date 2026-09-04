@@ -371,3 +371,35 @@ class DocumentIntelligence(DomainModel):
     sources: tuple[SourceReference, ...] = ()
     chunk_count: NonNegativeInt = 0
     embedding_count: NonNegativeInt = 0
+
+
+class RetrievalHit(DomainModel):
+    chunk_id: UUID
+    document_id: UUID
+    filename: Annotated[str, Field(min_length=1)]
+    content: Annotated[str, Field(min_length=1)]
+    section: str | None = None
+    page_start: PositiveInt | None = None
+    page_end: PositiveInt | None = None
+    score: float
+    match_types: tuple[QueryType, ...] = ()
+    citation_number: PositiveInt | None = None
+
+
+class GeneratedCitation(DomainModel):
+    source_number: PositiveInt
+    chunk_id: UUID
+
+
+class GeneratedAnswer(DomainModel):
+    answer: Annotated[str, Field(min_length=1)]
+    citations: tuple[GeneratedCitation, ...] = ()
+
+
+class QueryResult(DomainModel):
+    id: UUID
+    query: Annotated[str, Field(min_length=1)]
+    query_type: QueryType
+    answer: Annotated[str, Field(min_length=1)]
+    sources: tuple[RetrievalHit, ...] = ()
+    created_at: datetime

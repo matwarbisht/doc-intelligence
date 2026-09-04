@@ -15,8 +15,10 @@ from app.services.processing_service import (
     ProcessingError,
     ProcessingResult,
 )
+from app.services.query_service import CorpusQueryService, EmptyQueryError, QueryServiceError
 
 __all__ = [
+    "CorpusQueryService",
     "DocumentService",
     "DocumentProcessingService",
     "DocumentEnrichmentService",
@@ -24,9 +26,11 @@ __all__ = [
     "DocumentUpload",
     "DocumentUploadError",
     "EmptyDocumentError",
+    "EmptyQueryError",
     "EnrichmentResult",
     "FileTooLargeError",
     "ProcessingError",
     "ProcessingResult",
+    "QueryServiceError",
     "UnsupportedDocumentTypeError",
 ]

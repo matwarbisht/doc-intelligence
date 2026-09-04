@@ -22,6 +22,7 @@ from app.repositories import (
     PostgresDocumentRepository,
     PostgresEnrichmentRepository,
     PostgresProcessingRepository,
+    PostgresQueryRepository,
 )
 from app.services import DocumentEnrichmentService, DocumentProcessingService, DocumentService
 
@@ -118,6 +119,9 @@ class IntegrationEmbeddings:
         return tuple(
             ChunkVector(chunk_id=chunk.id, values=(1.0,) + (0.0,) * 767) for chunk in chunks
         )
+
+    async def embed_query(self, query: str) -> tuple[float, ...]:
+        return (1.0,) + (0.0,) * 767
 
 
 @pytest.mark.asyncio
@@ -339,6 +343,16 @@ async def test_enrichment_persists_semantics_embeddings_and_ready_state() -> Non
                 IntegrationEmbeddings(),
             ).process_document(upload.document.id)
             detail = await documents.get_intelligence(upload.document.id)
+            queries = PostgresQueryRepository(pool)
+            keyword_hits = await queries.search_keyword("provenance", limit=5)
+            semantic_hits = await queries.search_semantic(
+                (1.0,) + (0.0,) * 767,
+                provider="gemini",
+                model_name="integration-embedding",
+                dimension=768,
+                limit=5,
+            )
+            structured_hits = await queries.search_structured("Canonical output", limit=5)
 
             assert result.document is not None and result.document.status == "ready"
             assert detail is not None
@@ -348,6 +362,9 @@ async def test_enrichment_persists_semantics_embeddings_and_ready_state() -> Non
             assert len(detail.facts) == 1
             assert len(detail.relationships) == 1
             assert detail.embedding_count == detail.chunk_count == 1
+            assert keyword_hits[0].document_id == upload.document.id
+            assert semantic_hits[0].document_id == upload.document.id
+            assert structured_hits[0].document_id == upload.document.id
             assert [job.stage.value for job in detail.jobs] == [
                 "queued",
                 "parsing",

@@ -56,7 +56,7 @@ Phase 2 is complete when a fresh checkout can start Supabase, rebuild the schema
 - Persist summaries, topics, entities, facts, relationships, and embeddings.
 - Expose processing progress and document-detail data.
 
-## Phase 6 — Retrieval and cited answers
+## Phase 6 — Retrieval and cited answers (complete)
 
 - Implement keyword, semantic, structured, and hybrid retrieval.
 - Generate corpus answers grounded in retrieved chunks.

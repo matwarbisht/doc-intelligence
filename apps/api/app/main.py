@@ -9,6 +9,7 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.db import create_database_pool
 from app.providers import (
+    GeminiAnswerGenerator,
     GeminiEmbeddingProvider,
     GeminiSemanticExtractor,
     SupabaseObjectStorage,
@@ -18,8 +19,10 @@ from app.repositories import (
     PostgresDocumentRepository,
     PostgresEnrichmentRepository,
     PostgresProcessingRepository,
+    PostgresQueryRepository,
 )
 from app.services import (
+    CorpusQueryService,
     DocumentEnrichmentService,
     DocumentPipelineService,
     DocumentProcessingService,
@@ -34,6 +37,7 @@ LOCAL_CORS_ORIGIN_REGEX = r"^https?://(?:localhost|127\.0\.0\.1)(?::\d+)?$"
 async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
     application.state.document_service = None
     application.state.processing_service = None
+    application.state.query_service = None
     if settings.database_url and settings.supabase_url and settings.supabase_service_role_key:
         pool = await create_database_pool(settings.database_url)
         async with httpx.AsyncClient(timeout=30) as client:
@@ -48,6 +52,28 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
                 storage,
                 max_upload_bytes=settings.max_upload_bytes,
             )
+            embedding_provider = None
+            if settings.gemini_api_key:
+                embedding_provider = GeminiEmbeddingProvider(
+                    client,
+                    api_key=settings.gemini_api_key,
+                    model_name=settings.gemini_embedding_model,
+                    dimension=settings.gemini_embedding_dimension,
+                    timeout_seconds=settings.gemini_timeout_seconds,
+                    concurrency=settings.gemini_embedding_concurrency,
+                )
+                application.state.query_service = CorpusQueryService(
+                    PostgresQueryRepository(pool),
+                    embedding_provider,
+                    GeminiAnswerGenerator(
+                        client,
+                        api_key=settings.gemini_api_key,
+                        model_name=settings.gemini_answer_model,
+                        timeout_seconds=settings.gemini_timeout_seconds,
+                    ),
+                    candidate_limit=settings.retrieval_candidate_limit,
+                    max_sources=settings.retrieval_max_sources,
+                )
             if settings.unstructured_api_url and settings.unstructured_api_key:
                 parser = UnstructuredDocumentParser(
                     client,
@@ -66,7 +92,7 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
                     max_chunk_characters=settings.max_chunk_characters,
                 )
                 application.state.processing_service = parsing_service
-                if settings.gemini_api_key:
+                if settings.gemini_api_key and embedding_provider is not None:
                     enrichment_service = DocumentEnrichmentService(
                         PostgresEnrichmentRepository(pool),
                         GeminiSemanticExtractor(
@@ -75,14 +101,7 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
                             model_name=settings.gemini_extraction_model,
                             timeout_seconds=settings.gemini_timeout_seconds,
                         ),
-                        GeminiEmbeddingProvider(
-                            client,
-                            api_key=settings.gemini_api_key,
-                            model_name=settings.gemini_embedding_model,
-                            dimension=settings.gemini_embedding_dimension,
-                            timeout_seconds=settings.gemini_timeout_seconds,
-                            concurrency=settings.gemini_embedding_concurrency,
-                        ),
+                        embedding_provider,
                         max_attempts=settings.processing_max_attempts,
                         stale_after_seconds=settings.processing_stale_after_seconds,
                     )

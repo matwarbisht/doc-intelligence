@@ -4,6 +4,7 @@ import { HomePage } from '../pages/HomePage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { DocumentsPage } from '../pages/Documents/DocumentsPage';
 import { DocumentDetailPage } from '../pages/Documents/DocumentDetailPage';
+import { QueryPage } from '../pages/Query/QueryPage';
 import { StyleGuide } from '../pages/StyleGuide/StyleGuide';
 import styles from './App.module.scss';
 
@@ -21,6 +22,9 @@ export function App() {
           <NavLink className={styles.navLink} to="/documents">
             Documents
           </NavLink>
+          <NavLink className={styles.navLink} to="/ask">
+            Ask
+          </NavLink>
           <NavLink className={styles.navLink} to="/style-guide">
             Style guide
           </NavLink>
@@ -30,6 +34,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/documents" element={<DocumentsPage />} />
+          <Route path="/ask" element={<QueryPage />} />
           <Route
             path="/documents/:documentId"
             element={<DocumentDetailPage />}

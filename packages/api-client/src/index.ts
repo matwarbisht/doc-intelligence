@@ -100,6 +100,30 @@ export interface DocumentDetail extends DocumentRecord {
   embedding_count: number;
 }
 
+export type QueryType = 'keyword' | 'semantic' | 'structured' | 'hybrid';
+
+export interface QuerySource {
+  citation_number: number;
+  document_id: string;
+  chunk_id: string;
+  filename: string;
+  section: string | null;
+  page_start: number | null;
+  page_end: number | null;
+  excerpt: string;
+  score: number;
+  match_types: QueryType[];
+}
+
+export interface CorpusQueryResponse {
+  id: string;
+  query: string;
+  query_type: QueryType;
+  answer: string;
+  sources: QuerySource[];
+  created_at: string;
+}
+
 export class ApiError extends Error {
   readonly status: number;
 
@@ -111,6 +135,10 @@ export class ApiError extends Error {
 }
 
 export interface DocumentApiClient {
+  queryCorpus(
+    query: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<CorpusQueryResponse>;
   listDocuments(options?: {
     signal?: AbortSignal;
   }): Promise<DocumentListResponse>;
@@ -134,6 +162,14 @@ export function createDocumentApiClient(
   const apiUrl = baseUrl.replace(/\/$/, '');
 
   return {
+    queryCorpus: (query, { signal } = {}) =>
+      request<CorpusQueryResponse>(`${apiUrl}/api/v1/query`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ query }),
+        signal,
+      }),
+
     listDocuments: ({ signal } = {}) =>
       request<DocumentListResponse>(`${apiUrl}/api/v1/documents`, { signal }),
 

@@ -110,4 +110,35 @@ describe('document API client', () => {
       { signal: undefined },
     );
   });
+
+  it('queries the corpus with JSON', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'query-1',
+          query: 'What changed?',
+          query_type: 'hybrid',
+          answer: 'Revenue increased [1].',
+          sources: [],
+          created_at: '2026-09-05T00:00:00Z',
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result =
+      await createDocumentApiClient('http://api.test').queryCorpus(
+        'What changed?',
+      );
+
+    expect(result.query_type).toBe('hybrid');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/query',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ query: 'What changed?' }),
+      }),
+    );
+  });
 });
