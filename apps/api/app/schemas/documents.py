@@ -42,3 +42,8 @@ class DocumentListResponse(BaseModel):
     items: list[DocumentResponse]
     limit: int
     offset: int
+
+
+class DocumentProcessResponse(BaseModel):
+    document_id: UUID
+    accepted: bool = True

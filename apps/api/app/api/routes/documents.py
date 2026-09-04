@@ -3,13 +3,30 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 
-from app.api.dependencies import get_document_service
+from app.api.dependencies import get_document_service, get_processing_service
 from app.core.config import get_settings
 from app.providers import ObjectStorageError
-from app.schemas.documents import DocumentListResponse, DocumentResponse, DocumentUploadResponse
+from app.schemas.documents import (
+    DocumentListResponse,
+    DocumentProcessResponse,
+    DocumentResponse,
+    DocumentUploadResponse,
+)
 from app.services import (
+    DocumentProcessingService,
     DocumentService,
     DocumentUploadError,
     EmptyDocumentError,
@@ -19,12 +36,18 @@ from app.services import (
 
 router = APIRouter(prefix="/documents")
 DocumentServiceDependency = Annotated[DocumentService, Depends(get_document_service)]
+ProcessingServiceDependency = Annotated[
+    DocumentProcessingService,
+    Depends(get_processing_service),
+]
 
 
 @router.post("", response_model=DocumentUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
     file: Annotated[UploadFile, File(description="PDF, DOCX, Markdown, or plain text document")],
     response: Response,
+    request: Request,
+    background_tasks: BackgroundTasks,
     service: DocumentServiceDependency,
 ) -> DocumentUploadResponse:
     settings = get_settings()
@@ -62,10 +85,31 @@ async def upload_document(
 
     if result.duplicate:
         response.status_code = status.HTTP_200_OK
+    else:
+        processing_service = getattr(request.app.state, "processing_service", None)
+        if isinstance(processing_service, DocumentProcessingService):
+            background_tasks.add_task(
+                processing_service.process_document,
+                result.document.id,
+            )
     return DocumentUploadResponse(
         document=DocumentResponse.from_domain(result.document),
         duplicate=result.duplicate,
     )
+
+
+@router.post(
+    "/{document_id}/process",
+    response_model=DocumentProcessResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def process_document(
+    document_id: UUID,
+    background_tasks: BackgroundTasks,
+    service: ProcessingServiceDependency,
+) -> DocumentProcessResponse:
+    background_tasks.add_task(service.process_document, document_id)
+    return DocumentProcessResponse(document_id=document_id)
 
 
 @router.get("", response_model=DocumentListResponse)

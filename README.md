@@ -57,5 +57,6 @@ Stage 1 focuses on a complete upload-to-cited-answer vertical slice. Authenticat
 - [Architecture](docs/architecture.md)
 - [Database model](docs/database.md)
 - [Document upload and lifecycle](docs/document-lifecycle.md)
+- [Parsing and canonicalization](docs/parsing-pipeline.md)
 - [Design system](docs/design-system.md)
 - [Repository structure](docs/repository-structure.md)

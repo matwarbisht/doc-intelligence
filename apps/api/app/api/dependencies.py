@@ -4,7 +4,7 @@ from typing import cast
 
 from fastapi import HTTPException, Request, status
 
-from app.services import DocumentService
+from app.services import DocumentProcessingService, DocumentService
 
 
 def get_document_service(request: Request) -> DocumentService:
@@ -13,5 +13,18 @@ def get_document_service(request: Request) -> DocumentService:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Document storage is not configured.",
+        )
+    return service
+
+
+def get_processing_service(request: Request) -> DocumentProcessingService:
+    service = cast(
+        DocumentProcessingService | None,
+        getattr(request.app.state, "processing_service", None),
+    )
+    if service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Document parsing is not configured.",
         )
     return service

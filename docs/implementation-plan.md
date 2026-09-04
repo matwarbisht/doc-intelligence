@@ -43,7 +43,7 @@ Phase 2 is complete when a fresh checkout can start Supabase, rebuild the schema
 - Persist document metadata and processing state.
 - Add the upload, document list, and initial status UI.
 
-## Phase 4 — Parsing and canonicalization
+## Phase 4 — Parsing and canonicalization (complete)
 
 - Add the parser provider contract and Unstructured adapter.
 - Normalize parser output into canonical elements.

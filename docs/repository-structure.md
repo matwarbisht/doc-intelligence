@@ -93,13 +93,16 @@ apps/api/
 │   │   └── pool.py             # asyncpg pool and database codecs
 │   ├── domain/
 │   │   └── models.py           # Infrastructure-independent domain models
-│   ├── providers/              # Private Storage and future AI adapters
+│   ├── providers/              # Storage and Unstructured parser adapters
 │   ├── repositories/
 │   │   ├── document_repository.py          # Persistence protocol
-│   │   └── postgres_document_repository.py # Postgres adapter
-│   ├── services/               # Upload and lifecycle orchestration
+│   │   ├── postgres_document_repository.py # Document Postgres adapter
+│   │   ├── processing_repository.py        # Processing persistence protocol
+│   │   └── postgres_processing_repository.py # Processing Postgres adapter
+│   ├── services/               # Upload, parsing, canonicalization, and chunking
 │   ├── schemas/
-│   │   └── health.py           # HTTP response schema
+│   │   ├── documents.py        # Document HTTP schemas
+│   │   └── health.py           # Health HTTP schema
 │   └── main.py                 # FastAPI application entry point
 ├── tests/
 │   └── test_health.py
@@ -124,7 +127,7 @@ The current backend boundaries are:
 app/
 ├── domain/                     # Infrastructure-independent models
 ├── services/                   # Use-case orchestration
-├── providers/                  # Storage and future AI adapters
+├── providers/                  # Storage, parser, and future AI adapters
 └── repositories/               # Persistence boundaries and adapters
 ```
 
@@ -171,7 +174,7 @@ React features and TanStack Query hooks
 
 This keeps endpoint URLs, request and response types, error handling, and later authentication headers out of individual React components. It also lets backend contract changes surface as frontend compilation errors.
 
-The package currently contains only the default API URL and proves that local workspace-package imports work. In a later phase, code generation from FastAPI's OpenAPI schema will populate the client with typed endpoint functions and models.
+The package currently contains the typed upload, document-list, document-detail, and processing request functions. A later phase can replace the handwritten types with OpenAPI generation as the contract surface grows.
 
 The API client must not contain backend business logic, database models, provider SDKs, or UI components.
 
@@ -183,7 +186,7 @@ This directory owns local Supabase configuration and version-controlled SQL migr
 
 Phase 1 adds migrations for documents, document versions, processing jobs, canonical elements, chunks, extraction runs, entities, mentions, facts, relationships, queries, and vector support. See [Database Model](database.md).
 
-Large original document files will live in Supabase Storage rather than Postgres.
+Large original document files live in Supabase Storage rather than Postgres. Canonical elements and provenance-aware chunks produced by Phase 4 live in Postgres.
 
 ### `examples/`
 

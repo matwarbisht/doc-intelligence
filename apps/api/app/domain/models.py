@@ -142,6 +142,18 @@ class CanonicalElement(DomainModel):
     created_at: datetime
 
 
+class NewCanonicalElement(DomainModel):
+    id: UUID
+    document_version_id: UUID
+    ordinal: NonNegativeInt
+    element_type: ElementType
+    parent_element_id: UUID | None = None
+    text_content: str | None = None
+    page_number: PositiveInt | None = None
+    structured_content: StructuredContent | None = None
+    metadata: Metadata = Field(default_factory=dict)
+
+
 class CanonicalDocument(DomainModel):
     version: DocumentVersion
     elements: tuple[CanonicalElement, ...]
@@ -159,6 +171,29 @@ class Chunk(DomainModel):
     source_element_ids: tuple[UUID, ...] = ()
     metadata: Metadata = Field(default_factory=dict)
     created_at: datetime
+
+    @model_validator(mode="after")
+    def page_range_is_ordered(self) -> Self:
+        if (
+            self.page_start is not None
+            and self.page_end is not None
+            and self.page_end < self.page_start
+        ):
+            raise ValueError("page_end must be greater than or equal to page_start")
+        return self
+
+
+class NewChunk(DomainModel):
+    id: UUID
+    document_version_id: UUID
+    ordinal: NonNegativeInt
+    content: Annotated[str, Field(min_length=1)]
+    content_hash: Annotated[str, Field(min_length=1)]
+    section: str | None = None
+    page_start: PositiveInt | None = None
+    page_end: PositiveInt | None = None
+    source_element_ids: tuple[UUID, ...] = ()
+    metadata: Metadata = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def page_range_is_ordered(self) -> Self:

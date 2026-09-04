@@ -16,12 +16,16 @@ from app.domain.models import (
     ExtractionStatus,
     Fact,
     JobStatus,
+    Metadata,
+    NewCanonicalElement,
+    NewChunk,
     NewDocument,
     ProcessingJob,
     ProcessingStage,
     QueryType,
     Relationship,
     SourceReference,
+    StructuredContent,
 )
 
 __all__ = [
@@ -40,10 +44,14 @@ __all__ = [
     "ExtractionStatus",
     "Fact",
     "JobStatus",
+    "Metadata",
+    "NewCanonicalElement",
+    "NewChunk",
     "NewDocument",
     "ProcessingJob",
     "ProcessingStage",
     "QueryType",
     "Relationship",
     "SourceReference",
+    "StructuredContent",
 ]

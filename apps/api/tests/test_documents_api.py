@@ -78,3 +78,17 @@ def test_rejects_unsupported_upload() -> None:
 
     assert response.status_code == 415
     assert response.json()["detail"].startswith("Unsupported document type")
+
+
+def test_process_endpoint_requires_a_configured_parser() -> None:
+    service = DocumentService(InMemoryDocumentRepository(), InMemoryObjectStorage())
+    application, client = create_test_client(service)
+
+    try:
+        response = client.post("/api/v1/documents/8f74b58e-82e5-4e0d-adfe-c2dc55bd1fc0/process")
+    finally:
+        client.close()
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Document parsing is not configured."}

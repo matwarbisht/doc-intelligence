@@ -34,6 +34,11 @@ export interface DocumentUploadResponse {
   duplicate: boolean;
 }
 
+export interface DocumentProcessResponse {
+  document_id: string;
+  accepted: boolean;
+}
+
 export class ApiError extends Error {
   readonly status: number;
 
@@ -56,6 +61,10 @@ export interface DocumentApiClient {
     file: File,
     options?: { signal?: AbortSignal },
   ): Promise<DocumentUploadResponse>;
+  processDocument(
+    id: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<DocumentProcessResponse>;
 }
 
 export function createDocumentApiClient(
@@ -82,6 +91,12 @@ export function createDocumentApiClient(
         signal,
       });
     },
+
+    processDocument: (id, { signal } = {}) =>
+      request<DocumentProcessResponse>(
+        `${apiUrl}/api/v1/documents/${encodeURIComponent(id)}/process`,
+        { method: 'POST', signal },
+      ),
   };
 }
 

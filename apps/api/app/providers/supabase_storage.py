@@ -51,6 +51,15 @@ class SupabaseObjectStorage:
         if response.is_error and response.status_code != 404:
             raise ObjectStorageError(f"Supabase delete failed with status {response.status_code}")
 
+    async def download(self, path: str) -> bytes:
+        response = await self._client.get(
+            self._object_url(path),
+            headers=self._headers,
+        )
+        if response.is_error:
+            raise ObjectStorageError(f"Supabase download failed with status {response.status_code}")
+        return response.content
+
     def _object_url(self, path: str) -> str:
         bucket = quote(self._bucket, safe="")
         object_path = quote(path, safe="/")

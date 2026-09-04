@@ -3,6 +3,7 @@ from pathlib import Path
 MIGRATIONS = Path(__file__).parents[3] / "supabase" / "migrations"
 SCHEMA = MIGRATIONS / "20260903010000_initial_document_schema.sql"
 STORAGE = MIGRATIONS / "20260903010100_create_documents_bucket.sql"
+PROCESSING = MIGRATIONS / "20260904010000_processing_pipeline_constraints.sql"
 SEED = MIGRATIONS.parent / "seed.sql"
 
 
@@ -51,3 +52,10 @@ def test_local_seed_is_synthetic_and_has_provenance() -> None:
     assert "insert into public.chunks" in sql
     assert "source_element_ids" in sql
     assert "insert into public.facts" in sql
+
+
+def test_processing_migration_supports_idempotent_stages_and_repeated_content() -> None:
+    sql = PROCESSING.read_text()
+
+    assert "unique (document_version_id, stage)" in sql
+    assert "drop constraint chunks_document_version_id_content_hash_key" in sql

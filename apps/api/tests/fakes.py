@@ -95,3 +95,6 @@ class InMemoryObjectStorage:
     async def delete(self, path: str) -> None:
         self.objects.pop(path, None)
         self.deleted.append(path)
+
+    async def download(self, path: str) -> bytes:
+        return self.objects[path][0]

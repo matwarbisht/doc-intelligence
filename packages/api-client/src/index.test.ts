@@ -63,4 +63,22 @@ describe('document API client', () => {
       new ApiError('Unsupported document type.', 415),
     );
   });
+
+  it('requests parsing for a document', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ document_id: 'doc-1', accepted: true }), {
+        status: 202,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createDocumentApiClient('http://api.test');
+
+    await client.processDocument('doc-1');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/documents/doc-1/process',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
 });
