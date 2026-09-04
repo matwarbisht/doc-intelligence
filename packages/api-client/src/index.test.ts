@@ -81,4 +81,33 @@ describe('document API client', () => {
       expect.objectContaining({ method: 'POST' }),
     );
   });
+
+  it('loads document intelligence details', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'doc-1',
+          processing: [],
+          extraction: null,
+          entities: [],
+          facts: [],
+          relationships: [],
+          sources: [],
+          chunk_count: 2,
+          embedding_count: 2,
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response =
+      await createDocumentApiClient('http://api.test').getDocument('doc-1');
+
+    expect(response.chunk_count).toBe(2);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/documents/doc-1',
+      { signal: undefined },
+    );
+  });
 });

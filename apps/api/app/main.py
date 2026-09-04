@@ -8,9 +8,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.db import create_database_pool
-from app.providers import SupabaseObjectStorage, UnstructuredDocumentParser
-from app.repositories import PostgresDocumentRepository, PostgresProcessingRepository
-from app.services import DocumentProcessingService, DocumentService
+from app.providers import (
+    GeminiEmbeddingProvider,
+    GeminiSemanticExtractor,
+    SupabaseObjectStorage,
+    UnstructuredDocumentParser,
+)
+from app.repositories import (
+    PostgresDocumentRepository,
+    PostgresEnrichmentRepository,
+    PostgresProcessingRepository,
+)
+from app.services import (
+    DocumentEnrichmentService,
+    DocumentPipelineService,
+    DocumentProcessingService,
+    DocumentService,
+)
 
 settings = get_settings()
 LOCAL_CORS_ORIGIN_REGEX = r"^https?://(?:localhost|127\.0\.0\.1)(?::\d+)?$"
@@ -43,7 +57,7 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
                     timeout_seconds=settings.unstructured_timeout_seconds,
                     poll_interval_seconds=settings.unstructured_poll_interval_seconds,
                 )
-                application.state.processing_service = DocumentProcessingService(
+                parsing_service = DocumentProcessingService(
                     PostgresProcessingRepository(pool),
                     storage,
                     parser,
@@ -51,6 +65,31 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
                     stale_after_seconds=settings.processing_stale_after_seconds,
                     max_chunk_characters=settings.max_chunk_characters,
                 )
+                application.state.processing_service = parsing_service
+                if settings.gemini_api_key:
+                    enrichment_service = DocumentEnrichmentService(
+                        PostgresEnrichmentRepository(pool),
+                        GeminiSemanticExtractor(
+                            client,
+                            api_key=settings.gemini_api_key,
+                            model_name=settings.gemini_extraction_model,
+                            timeout_seconds=settings.gemini_timeout_seconds,
+                        ),
+                        GeminiEmbeddingProvider(
+                            client,
+                            api_key=settings.gemini_api_key,
+                            model_name=settings.gemini_embedding_model,
+                            dimension=settings.gemini_embedding_dimension,
+                            timeout_seconds=settings.gemini_timeout_seconds,
+                            concurrency=settings.gemini_embedding_concurrency,
+                        ),
+                        max_attempts=settings.processing_max_attempts,
+                        stale_after_seconds=settings.processing_stale_after_seconds,
+                    )
+                    application.state.processing_service = DocumentPipelineService(
+                        parsing_service,
+                        enrichment_service,
+                    )
             try:
                 yield
             finally:

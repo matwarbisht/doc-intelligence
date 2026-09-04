@@ -20,12 +20,14 @@ from app.api.dependencies import get_document_service, get_processing_service
 from app.core.config import get_settings
 from app.providers import ObjectStorageError
 from app.schemas.documents import (
+    DocumentDetailResponse,
     DocumentListResponse,
     DocumentProcessResponse,
     DocumentResponse,
     DocumentUploadResponse,
 )
 from app.services import (
+    DocumentPipelineService,
     DocumentProcessingService,
     DocumentService,
     DocumentUploadError,
@@ -37,7 +39,7 @@ from app.services import (
 router = APIRouter(prefix="/documents")
 DocumentServiceDependency = Annotated[DocumentService, Depends(get_document_service)]
 ProcessingServiceDependency = Annotated[
-    DocumentProcessingService,
+    DocumentProcessingService | DocumentPipelineService,
     Depends(get_processing_service),
 ]
 
@@ -87,7 +89,7 @@ async def upload_document(
         response.status_code = status.HTTP_200_OK
     else:
         processing_service = getattr(request.app.state, "processing_service", None)
-        if isinstance(processing_service, DocumentProcessingService):
+        if isinstance(processing_service, (DocumentProcessingService, DocumentPipelineService)):
             background_tasks.add_task(
                 processing_service.process_document,
                 result.document.id,
@@ -126,15 +128,15 @@ async def list_documents(
     )
 
 
-@router.get("/{document_id}", response_model=DocumentResponse)
+@router.get("/{document_id}", response_model=DocumentDetailResponse)
 async def get_document(
     document_id: UUID,
     service: DocumentServiceDependency,
-) -> DocumentResponse:
-    document = await service.get_document(document_id)
-    if document is None:
+) -> DocumentDetailResponse:
+    intelligence = await service.get_document_intelligence(document_id)
+    if intelligence is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found.",
         )
-    return DocumentResponse.from_domain(document)
+    return DocumentDetailResponse.from_intelligence(intelligence)

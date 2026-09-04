@@ -3,6 +3,7 @@ import { Link, NavLink, Route, Routes } from 'react-router';
 import { HomePage } from '../pages/HomePage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { DocumentsPage } from '../pages/Documents/DocumentsPage';
+import { DocumentDetailPage } from '../pages/Documents/DocumentDetailPage';
 import { StyleGuide } from '../pages/StyleGuide/StyleGuide';
 import styles from './App.module.scss';
 
@@ -29,6 +30,10 @@ export function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/documents" element={<DocumentsPage />} />
+          <Route
+            path="/documents/:documentId"
+            element={<DocumentDetailPage />}
+          />
           <Route path="/style-guide" element={<StyleGuide />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

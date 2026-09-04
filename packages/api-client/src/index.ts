@@ -39,6 +39,67 @@ export interface DocumentProcessResponse {
   accepted: boolean;
 }
 
+export interface ProcessingProgress {
+  stage: 'queued' | 'parsing' | 'extracting' | 'embedding' | 'indexing';
+  status: 'pending' | 'running' | 'succeeded' | 'failed';
+  progress: number;
+  attempts: number;
+  error: string | null;
+}
+
+export interface ExtractionSummary {
+  status: 'pending' | 'running' | 'succeeded' | 'failed';
+  document_type: string | null;
+  summary: string | null;
+  topics: string[];
+}
+
+export interface ExtractedEntity {
+  id: string;
+  canonical_name: string;
+  entity_type: string;
+  normalized_value: string | null;
+}
+
+export interface ExtractedFact {
+  id: string;
+  source_chunk_id: string;
+  subject: string;
+  predicate: string;
+  object_value: string;
+  qualifiers: Record<string, unknown>;
+  confidence: number | null;
+}
+
+export interface ExtractedRelationship {
+  id: string;
+  source_chunk_id: string;
+  subject_entity_id: string;
+  predicate: string;
+  object_entity_id: string | null;
+  object_text: string | null;
+  confidence: number | null;
+}
+
+export interface SourceExcerpt {
+  chunk_id: string;
+  filename: string;
+  page_start: number | null;
+  page_end: number | null;
+  excerpt: string;
+}
+
+export interface DocumentDetail extends DocumentRecord {
+  processing: ProcessingProgress[];
+  extraction: ExtractionSummary | null;
+  entities: ExtractedEntity[];
+  facts: ExtractedFact[];
+  relationships: ExtractedRelationship[];
+  sources: SourceExcerpt[];
+  chunk_count: number;
+  embedding_count: number;
+}
+
 export class ApiError extends Error {
   readonly status: number;
 
@@ -56,7 +117,7 @@ export interface DocumentApiClient {
   getDocument(
     id: string,
     options?: { signal?: AbortSignal },
-  ): Promise<DocumentRecord>;
+  ): Promise<DocumentDetail>;
   uploadDocument(
     file: File,
     options?: { signal?: AbortSignal },
@@ -77,7 +138,7 @@ export function createDocumentApiClient(
       request<DocumentListResponse>(`${apiUrl}/api/v1/documents`, { signal }),
 
     getDocument: (id, { signal } = {}) =>
-      request<DocumentRecord>(
+      request<DocumentDetail>(
         `${apiUrl}/api/v1/documents/${encodeURIComponent(id)}`,
         { signal },
       ),

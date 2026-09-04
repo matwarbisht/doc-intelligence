@@ -5,6 +5,7 @@ import {
 } from '@doc-intelligence/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type FormEvent } from 'react';
+import { Link } from 'react-router';
 
 import { Button } from '../../components/Button/Button';
 import { Card } from '../../components/Card/Card';
@@ -25,6 +26,10 @@ export function DocumentsPage() {
   const documents = useQuery({
     queryKey: documentsQueryKey,
     queryFn: ({ signal }) => api.listDocuments({ signal }),
+    refetchInterval: (query) =>
+      query.state.data?.items.some((document) => isProcessing(document.status))
+        ? 2_000
+        : false,
   });
   const upload = useMutation({
     mutationFn: (selectedFile: File) => api.uploadDocument(selectedFile),
@@ -145,7 +150,9 @@ function DocumentRow({ document }: { document: DocumentRecord }) {
           {fileType(document)}
         </div>
         <div>
-          <h3>{document.filename}</h3>
+          <h3>
+            <Link to={`/documents/${document.id}`}>{document.filename}</Link>
+          </h3>
           <p>
             {formatFileSize(document.size_bytes)} · Added{' '}
             {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(
@@ -158,6 +165,12 @@ function DocumentRow({ document }: { document: DocumentRecord }) {
         {document.status.replaceAll('_', ' ')}
       </span>
     </article>
+  );
+}
+
+function isProcessing(status: DocumentRecord['status']): boolean {
+  return ['queued', 'parsing', 'extracting', 'embedding', 'indexing'].includes(
+    status,
   );
 }
 

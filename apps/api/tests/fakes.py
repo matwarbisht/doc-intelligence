@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from app.domain import Document, DocumentStatus, DocumentVersion, NewDocument
+from app.domain import Document, DocumentIntelligence, DocumentStatus, DocumentVersion, NewDocument
 
 
 class InMemoryDocumentRepository:
@@ -18,6 +18,10 @@ class InMemoryDocumentRepository:
 
     async def get(self, document_id: UUID) -> Document | None:
         return self.documents.get(document_id)
+
+    async def get_intelligence(self, document_id: UUID) -> DocumentIntelligence | None:
+        document = self.documents.get(document_id)
+        return None if document is None else DocumentIntelligence(document=document)
 
     async def get_by_content_hash(self, content_hash: str) -> Document | None:
         return next(

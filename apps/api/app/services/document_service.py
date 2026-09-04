@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from uuid import UUID, uuid4
 
-from app.domain import Document, NewDocument
+from app.domain import Document, DocumentIntelligence, NewDocument
 from app.providers import ObjectStorage, ObjectStorageError
 from app.repositories.document_repository import DocumentRepository, DuplicateDocumentError
 
@@ -119,6 +119,9 @@ class DocumentService:
 
     async def get_document(self, document_id: UUID) -> Document | None:
         return await self._repository.get(document_id)
+
+    async def get_document_intelligence(self, document_id: UUID) -> DocumentIntelligence | None:
+        return await self._repository.get_intelligence(document_id)
 
     async def _cleanup_storage(self, storage_path: str) -> None:
         with suppress(ObjectStorageError):

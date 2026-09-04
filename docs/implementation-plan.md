@@ -50,7 +50,7 @@ Phase 2 is complete when a fresh checkout can start Supabase, rebuild the schema
 - Create chunks with page and element provenance.
 - Make processing idempotent and retry-safe.
 
-## Phase 5 — Semantic enrichment and indexing
+## Phase 5 — Semantic enrichment and indexing (complete)
 
 - Add Gemini extraction and embedding adapters.
 - Persist summaries, topics, entities, facts, relationships, and embeddings.

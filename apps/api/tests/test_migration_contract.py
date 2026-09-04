@@ -4,6 +4,7 @@ MIGRATIONS = Path(__file__).parents[3] / "supabase" / "migrations"
 SCHEMA = MIGRATIONS / "20260903010000_initial_document_schema.sql"
 STORAGE = MIGRATIONS / "20260903010100_create_documents_bucket.sql"
 PROCESSING = MIGRATIONS / "20260904010000_processing_pipeline_constraints.sql"
+SEMANTIC_INDEXES = MIGRATIONS / "20260904020000_semantic_indexes.sql"
 SEED = MIGRATIONS.parent / "seed.sql"
 
 
@@ -59,3 +60,10 @@ def test_processing_migration_supports_idempotent_stages_and_repeated_content() 
 
     assert "unique (document_version_id, stage)" in sql
     assert "drop constraint chunks_document_version_id_content_hash_key" in sql
+
+
+def test_semantic_indexes_support_gemini_vector_retrieval() -> None:
+    sql = SEMANTIC_INDEXES.read_text()
+
+    assert "chunk_embeddings_gemini_768_cosine_idx" in sql
+    assert "vector_cosine_ops" in sql

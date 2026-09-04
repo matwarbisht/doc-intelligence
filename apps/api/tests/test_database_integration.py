@@ -7,9 +7,23 @@ import httpx
 import pytest
 
 from app.db import create_database_pool
+from app.domain import (
+    ChunkVector,
+    EntityType,
+    ExtractedEntity,
+    ExtractedFact,
+    ExtractedMention,
+    ExtractedRelationship,
+    ExtractionChunk,
+    SemanticExtraction,
+)
 from app.providers import ObjectStorageError, ParsedDocument, ParsedElement, SupabaseObjectStorage
-from app.repositories import PostgresDocumentRepository, PostgresProcessingRepository
-from app.services import DocumentProcessingService, DocumentService
+from app.repositories import (
+    PostgresDocumentRepository,
+    PostgresEnrichmentRepository,
+    PostgresProcessingRepository,
+)
+from app.services import DocumentEnrichmentService, DocumentProcessingService, DocumentService
 
 pytestmark = pytest.mark.integration
 
@@ -44,6 +58,65 @@ class IntegrationParser:
                     parent_provider_id="heading",
                 ),
             )
+        )
+
+
+class IntegrationExtractor:
+    provider_name = "integration-llm"
+    model_name = "integration-model"
+    model_version: str | None = "1"
+    prompt_version = "prompt-v1"
+    schema_version = "schema-v1"
+
+    async def extract(self, chunks: tuple[ExtractionChunk, ...]) -> SemanticExtraction:
+        chunk_id = chunks[0].id
+        return SemanticExtraction(
+            document_type="integration_report",
+            summary="Canonical output retains provenance.",
+            topics=("provenance",),
+            entities=(
+                ExtractedEntity(
+                    name="Canonical output",
+                    entity_type=EntityType.UNKNOWN,
+                    mentions=(
+                        ExtractedMention(
+                            source_chunk_id=chunk_id,
+                            surface_text="Canonical output",
+                            confidence=0.95,
+                        ),
+                    ),
+                ),
+            ),
+            facts=(
+                ExtractedFact(
+                    source_chunk_id=chunk_id,
+                    subject="Canonical output",
+                    predicate="retains",
+                    object_value="provenance",
+                    confidence=0.95,
+                ),
+            ),
+            relationships=(
+                ExtractedRelationship(
+                    source_chunk_id=chunk_id,
+                    subject="Canonical output",
+                    predicate="retains",
+                    object="provenance",
+                    confidence=0.95,
+                ),
+            ),
+        )
+
+
+class IntegrationEmbeddings:
+    provider_name = "gemini"
+    model_name = "integration-embedding"
+    model_version: str | None = "1"
+    dimension = 768
+
+    async def embed(self, chunks: tuple[ExtractionChunk, ...]) -> tuple[ChunkVector, ...]:
+        return tuple(
+            ChunkVector(chunk_id=chunk.id, values=(1.0,) + (0.0,) * 767) for chunk in chunks
         )
 
 
@@ -226,5 +299,68 @@ async def test_parsing_persists_canonical_elements_chunks_and_next_stage() -> No
                 await pool.execute(
                     "delete from public.documents where id = $1",
                     uploaded_document_id,
+                )
+            await pool.close()
+
+
+@pytest.mark.asyncio
+async def test_enrichment_persists_semantics_embeddings_and_ready_state() -> None:
+    database_url = os.getenv("TEST_DATABASE_URL")
+    supabase_url = os.getenv("TEST_SUPABASE_URL")
+    service_role_key = os.getenv("TEST_SUPABASE_SERVICE_ROLE_KEY")
+    if not database_url or not supabase_url or not service_role_key:
+        pytest.skip("set local database, Supabase URL, and service-role test variables")
+
+    pool = await create_database_pool(database_url)
+    uploaded_document_id = None
+    storage_path = None
+    async with httpx.AsyncClient(timeout=10) as client:
+        storage = SupabaseObjectStorage(
+            client,
+            supabase_url=supabase_url,
+            service_role_key=service_role_key,
+            bucket="documents",
+        )
+        documents = PostgresDocumentRepository(pool)
+        try:
+            upload = await DocumentService(documents, storage).upload(
+                filename="integration-parse.txt",
+                content_type="text/plain",
+                content=f"Integration enrichment {uuid4()}".encode(),
+            )
+            uploaded_document_id = upload.document.id
+            storage_path = upload.document.storage_path
+            await DocumentProcessingService(
+                PostgresProcessingRepository(pool), storage, IntegrationParser()
+            ).process_document(upload.document.id)
+            result = await DocumentEnrichmentService(
+                PostgresEnrichmentRepository(pool),
+                IntegrationExtractor(),
+                IntegrationEmbeddings(),
+            ).process_document(upload.document.id)
+            detail = await documents.get_intelligence(upload.document.id)
+
+            assert result.document is not None and result.document.status == "ready"
+            assert detail is not None
+            assert detail.extraction is not None
+            assert detail.extraction.summary == "Canonical output retains provenance."
+            assert len(detail.entities) == 1
+            assert len(detail.facts) == 1
+            assert len(detail.relationships) == 1
+            assert detail.embedding_count == detail.chunk_count == 1
+            assert [job.stage.value for job in detail.jobs] == [
+                "queued",
+                "parsing",
+                "extracting",
+                "embedding",
+                "indexing",
+            ]
+        finally:
+            if storage_path is not None:
+                with suppress(ObjectStorageError):
+                    await storage.delete(storage_path)
+            if uploaded_document_id is not None:
+                await pool.execute(
+                    "delete from public.documents where id = $1", uploaded_document_id
                 )
             await pool.close()

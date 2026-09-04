@@ -4,7 +4,7 @@ from typing import cast
 
 from fastapi import HTTPException, Request, status
 
-from app.services import DocumentProcessingService, DocumentService
+from app.services import DocumentPipelineService, DocumentProcessingService, DocumentService
 
 
 def get_document_service(request: Request) -> DocumentService:
@@ -17,9 +17,11 @@ def get_document_service(request: Request) -> DocumentService:
     return service
 
 
-def get_processing_service(request: Request) -> DocumentProcessingService:
+def get_processing_service(
+    request: Request,
+) -> DocumentProcessingService | DocumentPipelineService:
     service = cast(
-        DocumentProcessingService | None,
+        DocumentProcessingService | DocumentPipelineService | None,
         getattr(request.app.state, "processing_service", None),
     )
     if service is None:

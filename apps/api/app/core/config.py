@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     processing_max_attempts: int = Field(default=3, ge=1, le=10)
     processing_stale_after_seconds: int = Field(default=15 * 60, ge=60)
     max_chunk_characters: int = Field(default=2_000, ge=100)
+    gemini_api_key: str | None = None
+    gemini_extraction_model: str = "gemini-3.6-flash"
+    gemini_embedding_model: str = "gemini-embedding-001"
+    gemini_embedding_dimension: int = Field(default=768, ge=128, le=3072)
+    gemini_timeout_seconds: float = Field(default=120, gt=0)
+    gemini_embedding_concurrency: int = Field(default=5, ge=1, le=20)
 
     @field_validator("cors_origins", mode="before")
     @classmethod

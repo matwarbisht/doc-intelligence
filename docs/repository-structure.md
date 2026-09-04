@@ -93,13 +93,15 @@ apps/api/
 │   │   └── pool.py             # asyncpg pool and database codecs
 │   ├── domain/
 │   │   └── models.py           # Infrastructure-independent domain models
-│   ├── providers/              # Storage and Unstructured parser adapters
+│   ├── providers/              # Storage, Unstructured, and Gemini adapters
 │   ├── repositories/
 │   │   ├── document_repository.py          # Persistence protocol
 │   │   ├── postgres_document_repository.py # Document Postgres adapter
 │   │   ├── processing_repository.py        # Processing persistence protocol
-│   │   └── postgres_processing_repository.py # Processing Postgres adapter
-│   ├── services/               # Upload, parsing, canonicalization, and chunking
+│   │   ├── postgres_processing_repository.py # Processing Postgres adapter
+│   │   ├── enrichment_repository.py        # Enrichment persistence protocol
+│   │   └── postgres_enrichment_repository.py # Enrichment Postgres adapter
+│   ├── services/               # Upload, parsing, enrichment, and pipeline orchestration
 │   ├── schemas/
 │   │   ├── documents.py        # Document HTTP schemas
 │   │   └── health.py           # Health HTTP schema
@@ -186,7 +188,7 @@ This directory owns local Supabase configuration and version-controlled SQL migr
 
 Phase 1 adds migrations for documents, document versions, processing jobs, canonical elements, chunks, extraction runs, entities, mentions, facts, relationships, queries, and vector support. See [Database Model](database.md).
 
-Large original document files live in Supabase Storage rather than Postgres. Canonical elements and provenance-aware chunks produced by Phase 4 live in Postgres.
+Large original document files live in Supabase Storage rather than Postgres. Canonical elements and provenance-aware chunks produced by Phase 4 live in Postgres. Phase 5 adds versioned Gemini extraction results, evidence-linked semantic records, and provider/model-specific chunk embeddings.
 
 ### `examples/`
 

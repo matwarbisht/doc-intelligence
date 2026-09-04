@@ -8,6 +8,8 @@ from app.services.document_service import (
     FileTooLargeError,
     UnsupportedDocumentTypeError,
 )
+from app.services.enrichment_service import DocumentEnrichmentService, EnrichmentResult
+from app.services.pipeline_service import DocumentPipelineService
 from app.services.processing_service import (
     DocumentProcessingService,
     ProcessingError,
@@ -17,9 +19,12 @@ from app.services.processing_service import (
 __all__ = [
     "DocumentService",
     "DocumentProcessingService",
+    "DocumentEnrichmentService",
+    "DocumentPipelineService",
     "DocumentUpload",
     "DocumentUploadError",
     "EmptyDocumentError",
+    "EnrichmentResult",
     "FileTooLargeError",
     "ProcessingError",
     "ProcessingResult",

@@ -42,11 +42,11 @@ documents
 
 The MVP stores a dimensionless `vector` column and records the dimension on every row. This keeps the embedding provider replaceable while the model choice is still being evaluated. Queries must filter to one provider, model, and dimension before applying distance operations.
 
-No approximate-nearest-neighbor index is created initially. Exact search is simpler and performs well for a small MVP corpus. Add an HNSW index after the embedding model is fixed and measurements show it is needed.
+Phase 5 fixes the default MVP embedding configuration to Gemini `gemini-embedding-001` at 768 dimensions and adds a filtered HNSW cosine index for that provider/dimension combination. The underlying column remains dimensionless, so changing models requires a new filtered index and re-embedding the affected corpus rather than a schema rewrite.
 
 ## Migrations
 
-The first migration creates the public schema and enables pgvector. The second configures a private `documents` Storage bucket with a 50 MB limit for supported Stage 1 file types.
+The first migration creates the public schema and enables pgvector. The second configures a private `documents` Storage bucket with a 50 MB limit for supported Stage 1 file types. Later migrations add retry-safe processing-stage constraints and the filtered semantic vector index.
 
 Apply migrations through the Supabase CLI or the project's hosted Supabase migration workflow. To verify an already-migrated database from the API test suite:
 

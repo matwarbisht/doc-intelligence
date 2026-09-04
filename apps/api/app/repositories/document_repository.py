@@ -3,7 +3,7 @@
 from typing import Protocol
 from uuid import UUID
 
-from app.domain import Document, DocumentStatus, DocumentVersion, NewDocument
+from app.domain import Document, DocumentIntelligence, DocumentStatus, DocumentVersion, NewDocument
 
 
 class DuplicateDocumentError(RuntimeError):
@@ -14,6 +14,8 @@ class DocumentRepository(Protocol):
     async def create(self, document: NewDocument) -> Document: ...
 
     async def get(self, document_id: UUID) -> Document | None: ...
+
+    async def get_intelligence(self, document_id: UUID) -> DocumentIntelligence | None: ...
 
     async def get_by_content_hash(self, content_hash: str) -> Document | None: ...
 

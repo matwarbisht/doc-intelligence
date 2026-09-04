@@ -63,6 +63,32 @@ def test_duplicate_upload_returns_existing_document() -> None:
     assert duplicate.json()["document"]["id"] == first.json()["document"]["id"]
 
 
+def test_document_detail_exposes_processing_and_intelligence_shape() -> None:
+    service = DocumentService(InMemoryDocumentRepository(), InMemoryObjectStorage())
+    application, client = create_test_client(service)
+
+    try:
+        uploaded = client.post(
+            "/api/v1/documents",
+            files={"file": ("notes.txt", b"Document details", "text/plain")},
+        ).json()
+        response = client.get(f"/api/v1/documents/{uploaded['document']['id']}")
+    finally:
+        client.close()
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    detail = response.json()
+    assert detail["processing"] == []
+    assert detail["extraction"] is None
+    assert detail["entities"] == []
+    assert detail["facts"] == []
+    assert detail["relationships"] == []
+    assert detail["sources"] == []
+    assert detail["chunk_count"] == 0
+    assert detail["embedding_count"] == 0
+
+
 def test_rejects_unsupported_upload() -> None:
     service = DocumentService(InMemoryDocumentRepository(), InMemoryObjectStorage())
     application, client = create_test_client(service)

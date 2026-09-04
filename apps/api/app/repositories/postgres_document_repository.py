@@ -5,7 +5,19 @@ from uuid import UUID
 
 import asyncpg
 
-from app.domain import Document, DocumentStatus, DocumentVersion, NewDocument
+from app.domain import (
+    Document,
+    DocumentIntelligence,
+    DocumentStatus,
+    DocumentVersion,
+    Entity,
+    ExtractionRun,
+    Fact,
+    NewDocument,
+    ProcessingJob,
+    Relationship,
+    SourceReference,
+)
 from app.repositories.document_repository import DuplicateDocumentError
 
 
@@ -37,6 +49,102 @@ class PostgresDocumentRepository:
             document_id,
         )
         return None if row is None else self._to_document(row)
+
+    async def get_intelligence(self, document_id: UUID) -> DocumentIntelligence | None:
+        document = await self.get(document_id)
+        if document is None:
+            return None
+        version_id = await self._pool.fetchval(
+            """
+            select id from public.document_versions
+            where document_id=$1 order by version desc limit 1
+            """,
+            document_id,
+        )
+        if version_id is None:
+            return DocumentIntelligence(document=document)
+        jobs = await self._pool.fetch(
+            "select * from public.processing_jobs where document_version_id=$1 order by created_at",
+            version_id,
+        )
+        run_row = await self._pool.fetchrow(
+            """
+            select * from public.extraction_runs
+            where document_version_id=$1
+            order by (status='succeeded') desc, created_at desc limit 1
+            """,
+            version_id,
+        )
+        entities: list[asyncpg.Record] = []
+        facts: list[asyncpg.Record] = []
+        relationships: list[asyncpg.Record] = []
+        if run_row is not None:
+            entities = list(
+                await self._pool.fetch(
+                    """
+                    select * from public.entities
+                    where extraction_run_id=$1 order by canonical_name
+                    """,
+                    run_row["id"],
+                )
+            )
+            facts = list(
+                await self._pool.fetch(
+                    "select * from public.facts where extraction_run_id=$1 order by created_at,id",
+                    run_row["id"],
+                )
+            )
+            relationships = list(
+                await self._pool.fetch(
+                    """
+                    select * from public.relationships
+                    where extraction_run_id=$1 order by created_at,id
+                    """,
+                    run_row["id"],
+                )
+            )
+        chunk_rows = await self._pool.fetch(
+            """
+            select id,page_start,page_end,content from public.chunks
+            where document_version_id=$1 order by ordinal
+            """,
+            version_id,
+        )
+        embedding_count = await self._pool.fetchval(
+            """
+            select count(*) from public.chunk_embeddings ce
+            join public.chunks c on c.id=ce.chunk_id
+            where c.document_version_id=$1
+            """,
+            version_id,
+        )
+        return DocumentIntelligence(
+            document=document,
+            jobs=tuple(ProcessingJob.model_validate(cast(object, dict(row))) for row in jobs),
+            extraction=(
+                ExtractionRun.model_validate(cast(object, dict(run_row)))
+                if run_row is not None
+                else None
+            ),
+            entities=tuple(Entity.model_validate(cast(object, dict(row))) for row in entities),
+            facts=tuple(Fact.model_validate(cast(object, dict(row))) for row in facts),
+            relationships=tuple(
+                Relationship.model_validate(cast(object, dict(row))) for row in relationships
+            ),
+            sources=tuple(
+                SourceReference(
+                    chunk_id=row["id"],
+                    document_id=document.id,
+                    filename=document.filename,
+                    page_start=row["page_start"],
+                    page_end=row["page_end"],
+                    excerpt=row["content"][:500],
+                )
+                for row in chunk_rows
+            ),
+            chunk_count=len(chunk_rows),
+            embedding_count=int(embedding_count or 0),
+        )
 
     async def get_by_content_hash(self, content_hash: str) -> Document | None:
         row = await self._pool.fetchrow(

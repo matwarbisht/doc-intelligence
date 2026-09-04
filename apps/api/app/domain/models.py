@@ -309,3 +309,65 @@ class SourceReference(DomainModel):
     page_start: PositiveInt | None = None
     page_end: PositiveInt | None = None
     excerpt: str
+
+
+class ExtractionChunk(DomainModel):
+    id: UUID
+    content: Annotated[str, Field(min_length=1)]
+
+
+class ExtractedMention(DomainModel):
+    source_chunk_id: UUID
+    surface_text: Annotated[str, Field(min_length=1)]
+    confidence: Confidence | None = None
+
+
+class ExtractedEntity(DomainModel):
+    name: Annotated[str, Field(min_length=1)]
+    entity_type: EntityType = EntityType.UNKNOWN
+    normalized_value: str | None = None
+    mentions: tuple[ExtractedMention, ...] = ()
+
+
+class ExtractedFact(DomainModel):
+    source_chunk_id: UUID
+    subject: Annotated[str, Field(min_length=1)]
+    predicate: Annotated[str, Field(min_length=1)]
+    object_value: Annotated[str, Field(min_length=1)]
+    qualifiers: Metadata = Field(default_factory=dict)
+    confidence: Confidence | None = None
+
+
+class ExtractedRelationship(DomainModel):
+    source_chunk_id: UUID
+    subject: Annotated[str, Field(min_length=1)]
+    predicate: Annotated[str, Field(min_length=1)]
+    object: Annotated[str, Field(min_length=1)]
+    qualifiers: Metadata = Field(default_factory=dict)
+    confidence: Confidence | None = None
+
+
+class SemanticExtraction(DomainModel):
+    document_type: Annotated[str, Field(min_length=1)]
+    summary: Annotated[str, Field(min_length=1)]
+    topics: tuple[str, ...] = ()
+    entities: tuple[ExtractedEntity, ...] = ()
+    facts: tuple[ExtractedFact, ...] = ()
+    relationships: tuple[ExtractedRelationship, ...] = ()
+
+
+class ChunkVector(DomainModel):
+    chunk_id: UUID
+    values: tuple[float, ...]
+
+
+class DocumentIntelligence(DomainModel):
+    document: Document
+    jobs: tuple[ProcessingJob, ...] = ()
+    extraction: ExtractionRun | None = None
+    entities: tuple[Entity, ...] = ()
+    facts: tuple[Fact, ...] = ()
+    relationships: tuple[Relationship, ...] = ()
+    sources: tuple[SourceReference, ...] = ()
+    chunk_count: NonNegativeInt = 0
+    embedding_count: NonNegativeInt = 0

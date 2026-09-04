@@ -1,6 +1,7 @@
 """API request and response schemas."""
 
 from app.schemas.documents import (
+    DocumentDetailResponse,
     DocumentListResponse,
     DocumentProcessResponse,
     DocumentResponse,
@@ -9,6 +10,7 @@ from app.schemas.documents import (
 
 __all__ = [
     "DocumentListResponse",
+    "DocumentDetailResponse",
     "DocumentProcessResponse",
     "DocumentResponse",
     "DocumentUploadResponse",
