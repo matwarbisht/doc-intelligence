@@ -52,9 +52,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_origin_regex=(
-        LOCAL_CORS_ORIGIN_REGEX if settings.app_env == "development" else None
-    ),
+    allow_origin_regex=(LOCAL_CORS_ORIGIN_REGEX if settings.app_env == "development" else None),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
