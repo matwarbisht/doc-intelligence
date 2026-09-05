@@ -243,3 +243,53 @@ New decisions should be appended when a choice meaningfully affects architecture
 **The reasoning** — Documents are user-controlled and can contain text designed to redirect the model. Separating control instructions from evidence and stating the trust boundary is a low-cost defense that fits the existing provider adapter. Citation validation independently limits fabricated provenance even if model behavior is imperfect.
 
 **What we deliberately cut** — A full RAG-security policy engine, content classification, adversarial-model evaluation, and per-tenant retrieval authorization. System prompting is defense in depth, not a complete security boundary; stronger controls belong in Phase 7 and the later authentication phase.
+
+## D025 — Keep Phase 7 deployment provider-neutral
+
+**The decision** — Package the Vite application as an unprivileged Nginx container and FastAPI as a non-root Python container, with public URLs and secrets supplied through explicit environment contracts. Do not select a hosting vendor in the repository yet.
+
+**The alternatives** — Commit Vercel plus Render/Fly.io configuration now; combine the frontend and API into one image; or defer every deployment artifact until a host is chosen.
+
+**The reasoning** — The web and API already have independent runtime needs, and ordinary OCI images run on the credible hosting options without coupling architecture to one vendor. A static web image also preserves client-side routing and cache policy. The separation makes the compiled public API URL explicit and keeps service-role and provider credentials out of the browser.
+
+**What we deliberately cut** — Provider manifests, DNS, TLS, autoscaling, preview environments, and continuous deployment. Those choices depend on the eventual host, budget, and operational owner.
+
+## D026 — Reject extraction work above explicit input budgets
+
+**The decision** — Count canonical chunks and characters before a Gemini extraction call and fail the extraction stage when either configurable maximum is exceeded.
+
+**The alternatives** — Send any accepted upload to the model; silently truncate the document; estimate and enforce a monetary budget after calls; or split large documents into multiple model calls immediately.
+
+**The reasoning** — The upload-size limit does not predict parsed text volume or provider cost. A deterministic preflight bound prevents accidental high-cost requests and produces an actionable, retryable stage failure. Failing visibly preserves correctness better than silently extracting from only part of a document.
+
+**What we deliberately cut** — Token-level estimation, automatic map-reduce extraction, per-user budgets, invoices, and adaptive truncation. They require product policy and quality evaluation beyond this single-user MVP.
+
+## D027 — Use structured stdout logs and request IDs before an observability vendor
+
+**The decision** — Emit configurable console or JSON logs to stdout, propagate or create an `x-request-id`, and log HTTP timing, durable processing transitions, and retrieval counts using an allowlist of fields.
+
+**The alternatives** — Integrate a hosted logging/APM SDK; write logs to local files; include full provider payloads and document text; or rely only on persisted job status.
+
+**The reasoning** — Container platforms capture stdout, and JSON plus a request ID is enough to trace an upload or query across the current single API service. Allowlisting context keeps logs useful without leaking document content, credentials, or arbitrary provider responses. It also leaves the aggregation vendor replaceable.
+
+**What we deliberately cut** — Distributed traces, metrics, dashboards, alerts, sampling, and an observability vendor. Add them when a selected deployment and real service-level objectives define what must be measured.
+
+## D028 — Separate deterministic product tests from paid live smoke tests
+
+**The decision** — Exercise upload, parsing, enrichment, retrieval, answer generation, citations, and persistence in one database integration test with deterministic provider doubles. Keep a separate opt-in `make live-e2e` command for the same user path through real Unstructured and Gemini services using synthetic data.
+
+**The alternatives** — Call paid providers from CI; test every layer only in isolation; or use recorded provider responses as the sole end-to-end check.
+
+**The reasoning** — Deterministic doubles make the complete application orchestration fast and repeatable without network flakiness, quota, or secrets in CI. The live smoke catches provider-contract and credential drift that doubles cannot, while making its cost and local data mutation explicit.
+
+**What we deliberately cut** — Paid-provider CI, browser automation, a large retrieval benchmark, and scheduled canary traffic. The small evaluation manifest is a seed for later measurement, not a claim of retrieval quality.
+
+## D029 — Expose manual recovery before adding automatic retry infrastructure
+
+**The decision** — Show a retry action on failed document details and reuse the existing idempotent processing endpoint and durable job state.
+
+**The alternatives** — Require database intervention; automatically retry indefinitely; add a scheduler and dead-letter queue; or create separate retry endpoints for every processing stage.
+
+**The reasoning** — The existing pipeline already knows which durable stages succeeded and atomically claims retryable work. A user-triggered retry supplies immediate recovery without hiding repeated provider or configuration failures and without introducing another runtime service before deployment needs are known.
+
+**What we deliberately cut** — Backoff schedules, automatic retry policy by error class, dead-letter administration, and bulk retries. Those become important when processing no longer has an attentive MVP operator.

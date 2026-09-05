@@ -1,4 +1,4 @@
-.PHONY: install dev dev-local dev-web dev-api db-start db-stop db-status db-reset db-test db-test-upload db-verify build test lint typecheck format check clean
+.PHONY: install dev dev-local dev-web dev-api db-start db-stop db-status db-reset db-test db-test-upload db-verify live-e2e build test lint typecheck format check clean
 
 install:
 	pnpm install
@@ -35,6 +35,9 @@ db-test-upload:
 	./scripts/test-local-upload.sh
 
 db-verify: db-reset db-test-upload
+
+live-e2e:
+	./scripts/test-live-e2e.sh
 
 build:
 	pnpm build

@@ -3,11 +3,12 @@ import {
   DEFAULT_API_BASE_URL,
   type DocumentStatus,
 } from '@doc-intelligence/api-client';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 
 import { Card } from '../../components/Card/Card';
+import { Button } from '../../components/Button/Button';
 import styles from './DocumentDetailPage.module.scss';
 
 const api = createDocumentApiClient(
@@ -16,12 +17,21 @@ const api = createDocumentApiClient(
 
 export function DocumentDetailPage() {
   const { documentId = '' } = useParams();
+  const queryClient = useQueryClient();
   const document = useQuery({
     queryKey: ['documents', documentId],
     queryFn: ({ signal }) => api.getDocument(documentId, { signal }),
     enabled: Boolean(documentId),
     refetchInterval: (query) =>
       query.state.data && isProcessing(query.state.data.status) ? 2_000 : false,
+  });
+  const retry = useMutation({
+    mutationFn: () => api.processDocument(documentId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['documents', documentId],
+      });
+    },
   });
 
   if (document.isPending)
@@ -47,10 +57,26 @@ export function DocumentDetailPage() {
           <p className={styles.eyebrow}>Document intelligence</p>
           <h1>{detail.filename}</h1>
         </div>
-        <span className={styles.status} data-status={detail.status}>
-          {detail.status.replaceAll('_', ' ')}
-        </span>
+        <div className={styles.headerActions}>
+          <span className={styles.status} data-status={detail.status}>
+            {detail.status.replaceAll('_', ' ')}
+          </span>
+          {isFailed(detail.status) ? (
+            <Button
+              variant="secondary"
+              onClick={() => retry.mutate()}
+              disabled={retry.isPending}
+            >
+              {retry.isPending ? 'Retrying…' : 'Retry processing'}
+            </Button>
+          ) : null}
+        </div>
       </header>
+      {retry.error ? (
+        <p className={styles.retryError} role="alert">
+          {retry.error.message}
+        </p>
+      ) : null}
 
       <section className={styles.metrics} aria-label="Processing overview">
         <Card>
@@ -202,4 +228,8 @@ function isProcessing(status: DocumentStatus): boolean {
   return ['queued', 'parsing', 'extracting', 'embedding', 'indexing'].includes(
     status,
   );
+}
+
+function isFailed(status: DocumentStatus): boolean {
+  return status.endsWith('_failed');
 }

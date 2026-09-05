@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "query": "How much did Acme Robotics recurring revenue grow?",
+      "expected_source": "acme-quarterly-update.txt"
+    },
+    {
+      "query": "Who owns the Northstar reliability dashboard rollout?",
+      "expected_source": "northstar-meeting-notes.md"
+    },
+    {
+      "query": "What is the total amount due on invoice HBR-1042?",
+      "expected_source": "harbor-invoice.md"
+    }
+  ]
+}

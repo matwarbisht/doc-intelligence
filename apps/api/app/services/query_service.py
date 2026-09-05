@@ -1,12 +1,15 @@
 """Hybrid corpus retrieval and grounded-answer orchestration."""
 
 import asyncio
+import logging
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from app.domain import GeneratedCitation, QueryResult, QueryType, RetrievalHit
 from app.providers import AnswerGenerator, EmbeddingProvider
 from app.repositories import QueryRepository
+
+logger = logging.getLogger(__name__)
 
 
 class QueryServiceError(RuntimeError):
@@ -52,6 +55,16 @@ class CorpusQueryService:
                 self._repository.search_structured(normalized, limit=self._candidate_limit),
             )
             evidence = self._fuse(keyword, semantic, structured)[: self._max_sources]
+            logger.info(
+                "Corpus retrieval completed",
+                extra={
+                    "event": "query.retrieval.completed",
+                    "keyword_hits": len(keyword),
+                    "semantic_hits": len(semantic),
+                    "structured_hits": len(structured),
+                    "fused_hits": len(evidence),
+                },
+            )
             if evidence:
                 generated = await self._answer_generator.generate(normalized, evidence)
                 cited = self._resolve_citations(generated.citations, evidence)

@@ -15,6 +15,9 @@ from app.domain import (
     ExtractedMention,
     ExtractedRelationship,
     ExtractionChunk,
+    GeneratedAnswer,
+    GeneratedCitation,
+    RetrievalHit,
     SemanticExtraction,
 )
 from app.providers import ObjectStorageError, ParsedDocument, ParsedElement, SupabaseObjectStorage
@@ -24,7 +27,12 @@ from app.repositories import (
     PostgresProcessingRepository,
     PostgresQueryRepository,
 )
-from app.services import DocumentEnrichmentService, DocumentProcessingService, DocumentService
+from app.services import (
+    CorpusQueryService,
+    DocumentEnrichmentService,
+    DocumentProcessingService,
+    DocumentService,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -122,6 +130,21 @@ class IntegrationEmbeddings:
 
     async def embed_query(self, query: str) -> tuple[float, ...]:
         return (1.0,) + (0.0,) * 767
+
+
+class IntegrationAnswerGenerator:
+    provider_name = "integration-llm"
+    model_name = "integration-answer"
+    model_version: str | None = "1"
+    prompt_version = "answer-v1"
+    schema_version = "answer-v1"
+
+    async def generate(self, question: str, evidence: tuple[RetrievalHit, ...]) -> GeneratedAnswer:
+        assert question == "What does the canonical output retain?"
+        return GeneratedAnswer(
+            answer="The canonical output retains provenance [1].",
+            citations=(GeneratedCitation(source_number=1, chunk_id=evidence[0].chunk_id),),
+        )
 
 
 @pytest.mark.asyncio
@@ -318,6 +341,7 @@ async def test_enrichment_persists_semantics_embeddings_and_ready_state() -> Non
     pool = await create_database_pool(database_url)
     uploaded_document_id = None
     storage_path = None
+    query_id = None
     async with httpx.AsyncClient(timeout=10) as client:
         storage = SupabaseObjectStorage(
             client,
@@ -353,6 +377,12 @@ async def test_enrichment_persists_semantics_embeddings_and_ready_state() -> Non
                 limit=5,
             )
             structured_hits = await queries.search_structured("Canonical output", limit=5)
+            query_result = await CorpusQueryService(
+                queries,
+                IntegrationEmbeddings(),
+                IntegrationAnswerGenerator(),
+            ).query("What does the canonical output retain?")
+            query_id = query_result.id
 
             assert result.document is not None and result.document.status == "ready"
             assert detail is not None
@@ -365,6 +395,14 @@ async def test_enrichment_persists_semantics_embeddings_and_ready_state() -> Non
             assert keyword_hits[0].document_id == upload.document.id
             assert semantic_hits[0].document_id == upload.document.id
             assert structured_hits[0].document_id == upload.document.id
+            assert query_result.answer == "The canonical output retains provenance [1]."
+            assert query_result.sources[0].document_id == upload.document.id
+            assert (
+                await pool.fetchval(
+                    "select count(*) from public.queries where id=$1", query_result.id
+                )
+                == 1
+            )
             assert [job.stage.value for job in detail.jobs] == [
                 "queued",
                 "parsing",
@@ -373,6 +411,8 @@ async def test_enrichment_persists_semantics_embeddings_and_ready_state() -> Non
                 "indexing",
             ]
         finally:
+            if query_id is not None:
+                await pool.execute("delete from public.queries where id=$1", query_id)
             if storage_path is not None:
                 with suppress(ObjectStorageError):
                     await storage.delete(storage_path)

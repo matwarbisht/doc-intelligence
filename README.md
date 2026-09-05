@@ -47,6 +47,7 @@ make lint         # Run linters
 make typecheck    # Run static type checks
 make format       # Format the codebase
 make check        # Run every verification step
+make live-e2e     # Run provider-backed upload-to-answer smoke test
 ```
 
 Stage 1 focuses on a complete upload-to-cited-answer vertical slice. Authentication, billing, multi-tenancy, distributed queues, and dedicated search infrastructure are deferred.
@@ -61,5 +62,6 @@ Stage 1 focuses on a complete upload-to-cited-answer vertical slice. Authenticat
 - [Parsing and canonicalization](docs/parsing-pipeline.md)
 - [Semantic enrichment and indexing](docs/semantic-enrichment.md)
 - [Retrieval and cited answers](docs/retrieval-and-cited-answers.md)
+- [Deployment and operations](docs/deployment.md)
 - [Design system](docs/design-system.md)
 - [Repository structure](docs/repository-structure.md)

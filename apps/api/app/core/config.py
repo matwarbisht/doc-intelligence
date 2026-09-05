@@ -1,6 +1,7 @@
 from functools import lru_cache
+from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,12 +14,16 @@ class Settings(BaseSettings):
     )
 
     app_env: str = "development"
-    log_level: str = "INFO"
+    log_level: str = Field(
+        default="INFO", validation_alias=AliasChoices("LOG_LEVEL", "APP_LOG_LEVEL")
+    )
+    log_format: Literal["console", "json"] = "console"
     cors_origins: list[str] = Field(
         default_factory=lambda: [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
-        ]
+        ],
+        validation_alias=AliasChoices("CORS_ORIGINS", "APP_CORS_ORIGINS"),
     )
     database_url: str | None = None
     supabase_url: str | None = None
@@ -33,6 +38,8 @@ class Settings(BaseSettings):
     processing_max_attempts: int = Field(default=3, ge=1, le=10)
     processing_stale_after_seconds: int = Field(default=15 * 60, ge=60)
     max_chunk_characters: int = Field(default=2_000, ge=100)
+    max_extraction_chunks: int = Field(default=250, ge=1, le=2_000)
+    max_extraction_characters: int = Field(default=200_000, ge=1_000, le=2_000_000)
     gemini_api_key: str | None = None
     gemini_extraction_model: str = "gemini-3.6-flash"
     gemini_answer_model: str = "gemini-3.6-flash"

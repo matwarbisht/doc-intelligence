@@ -18,11 +18,13 @@ doc-intelligence/
 │
 ├── docs/                       # Architecture and engineering documentation
 ├── examples/                   # Safe example document corpus
+├── Dockerfile.web              # Production static-web container
 ├── scripts/
 │   ├── dev.sh                  # One-command local server launcher
 │   ├── dev-local.sh            # Local Supabase-aware app launcher
 │   ├── supabase.sh             # Project-pinned local Supabase launcher
 │   ├── test-local-upload.sh     # Storage and lifecycle integration test
+│   ├── test-live-e2e.sh         # Optional provider-backed product smoke test
 │   └── uv.sh                   # Portable uv command resolver
 ├── .github/workflows/          # Continuous integration
 ├── .env.example                # Environment-variable template
@@ -192,7 +194,11 @@ Large original document files live in Supabase Storage rather than Postgres. Can
 
 ### `examples/`
 
-This directory will contain a small, safe corpus for development and demonstrations. Only public or synthetic documents belong here; customer files, credentials, and personally identifiable information must not be committed.
+This directory contains a small, explicitly synthetic corpus for development and
+demonstrations, plus lightweight expected-source cases in `evaluation.json`.
+Customer files, credentials, and personally identifiable information must not be
+committed. `make live-e2e` uploads one sample through real configured providers;
+it mutates the local library and consumes provider quota.
 
 ## Root configuration
 

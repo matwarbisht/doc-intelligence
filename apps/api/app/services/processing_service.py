@@ -1,5 +1,6 @@
 """Retry-safe orchestration for document parsing and canonicalization."""
 
+import logging
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -8,6 +9,8 @@ from app.providers import DocumentParser, ObjectStorage
 from app.repositories import ParsingClaim, ProcessingRepository
 from app.services.canonicalization import canonicalize_document
 from app.services.chunking import create_chunks
+
+logger = logging.getLogger(__name__)
 
 
 class ProcessingError(RuntimeError):
@@ -47,6 +50,14 @@ class DocumentProcessingService:
         if claim is None:
             return ProcessingResult(claimed=False)
 
+        logger.info(
+            "Document stage started",
+            extra={
+                "event": "document.stage.started",
+                "document_id": str(document_id),
+                "stage": "parsing",
+            },
+        )
         try:
             document = await self._process_claim(claim)
         except Exception as error:
@@ -54,7 +65,25 @@ class DocumentProcessingService:
                 claim,
                 error=f"{type(error).__name__}: {error}",
             )
+            logger.warning(
+                "Document stage failed",
+                extra={
+                    "event": "document.stage.completed",
+                    "document_id": str(document_id),
+                    "stage": "parsing",
+                    "outcome": "failed",
+                },
+            )
             return ProcessingResult(claimed=True, document=failed)
+        logger.info(
+            "Document stage completed",
+            extra={
+                "event": "document.stage.completed",
+                "document_id": str(document_id),
+                "stage": "parsing",
+                "outcome": "succeeded",
+            },
+        )
         return ProcessingResult(claimed=True, document=document)
 
     async def _process_claim(self, claim: ParsingClaim) -> Document:

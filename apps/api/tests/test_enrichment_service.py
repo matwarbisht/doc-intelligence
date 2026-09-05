@@ -30,7 +30,11 @@ class FakeExtractor:
     prompt_version = "prompt-v1"
     schema_version = "schema-v1"
 
+    def __init__(self) -> None:
+        self.calls = 0
+
     async def extract(self, chunks):  # type: ignore[no-untyped-def]
+        self.calls += 1
         return SemanticExtraction(
             document_type="report",
             summary="Revenue grew.",
@@ -68,6 +72,7 @@ class FakeEnrichmentRepository:
         self.embedding_available = False
         self.saved_extraction: SemanticExtraction | None = None
         self.saved_vectors: tuple[ChunkVector, ...] = ()
+        self.failure: str | None = None
 
     async def claim_extraction(self, document_id: UUID, **kwargs):  # type: ignore[no-untyped-def]
         if not self.extraction_available:
@@ -81,6 +86,7 @@ class FakeEnrichmentRepository:
         return claim.document.model_copy(update={"status": DocumentStatus.EMBEDDING})
 
     async def fail_extraction(self, claim, *, error):  # type: ignore[no-untyped-def]
+        self.failure = error
         return claim.document.model_copy(update={"status": DocumentStatus.EXTRACTION_FAILED})
 
     async def claim_embedding(self, document_id: UUID, **kwargs):  # type: ignore[no-untyped-def]
@@ -173,3 +179,25 @@ async def test_enrichment_service_reaches_ready_with_extraction_and_embeddings()
     assert repository.saved_extraction is not None
     assert repository.saved_extraction.facts[0].source_chunk_id == extraction.chunks[0].id
     assert repository.saved_vectors[0].chunk_id == extraction.chunks[0].id
+
+
+@pytest.mark.asyncio
+async def test_enrichment_rejects_documents_over_the_extraction_budget() -> None:
+    extraction, embedding = claims()
+    repository = FakeEnrichmentRepository(extraction, embedding)
+    extractor = FakeExtractor()
+    service = DocumentEnrichmentService(
+        repository,
+        extractor,
+        FakeEmbeddings(),
+        max_extraction_characters=5,
+    )
+
+    result = await service.process_document(extraction.document.id)
+
+    assert result.document is not None
+    assert result.document.status is DocumentStatus.EXTRACTION_FAILED
+    assert extractor.calls == 0
+    assert repository.failure == (
+        "ValueError: Document exceeds the configured extraction character limit."
+    )

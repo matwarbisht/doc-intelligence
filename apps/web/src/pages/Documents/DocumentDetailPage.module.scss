@@ -48,6 +48,18 @@
   color: var(--color-danger);
   background: var(--color-danger-subtle);
 }
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.retryError {
+  margin: calc(var(--space-4) * -1) 0 var(--space-6);
+  padding: var(--space-3);
+  color: var(--color-danger);
+  background: var(--color-danger-subtle);
+  border-radius: var(--radius-md);
+}
 .metrics {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -171,6 +183,10 @@
     width: calc(100% - var(--space-6));
   }
   .header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .headerActions {
     align-items: flex-start;
     flex-direction: column;
   }

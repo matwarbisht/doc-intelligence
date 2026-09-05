@@ -62,8 +62,13 @@ Phase 2 is complete when a fresh checkout can start Supabase, rebuild the schema
 - Generate corpus answers grounded in retrieved chunks.
 - Return and display citations that resolve to source evidence.
 
-## Phase 7 — MVP hardening and deployment
+## Phase 7 — MVP hardening and deployment (complete)
 
-- Add the safe example corpus and end-to-end tests.
-- Add operational logging, failure recovery, cost limits, and deployment configuration.
-- Validate the complete upload-to-cited-answer user flow.
+- Add a safe, explicitly synthetic example corpus and deterministic end-to-end coverage.
+- Add request-correlated operational logs without recording document content or credentials.
+- Reject extraction inputs that exceed configurable chunk and character budgets.
+- Let users retry a failed processing pipeline from the document detail screen.
+- Package the frontend and API as provider-neutral, non-root containers.
+- Document production configuration and the current background-task runtime constraint.
+- Validate the complete upload-to-cited-answer user flow locally and with the optional
+  provider-backed `make live-e2e` smoke test.

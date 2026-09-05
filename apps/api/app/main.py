@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import get_settings
+from app.core.logging import configure_logging, log_request
 from app.db import create_database_pool
 from app.providers import (
     GeminiAnswerGenerator,
@@ -30,6 +31,7 @@ from app.services import (
 )
 
 settings = get_settings()
+configure_logging(level=settings.log_level, json_logs=settings.log_format == "json")
 LOCAL_CORS_ORIGIN_REGEX = r"^https?://(?:localhost|127\.0\.0\.1)(?::\d+)?$"
 
 
@@ -104,6 +106,8 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
                         embedding_provider,
                         max_attempts=settings.processing_max_attempts,
                         stale_after_seconds=settings.processing_stale_after_seconds,
+                        max_extraction_chunks=settings.max_extraction_chunks,
+                        max_extraction_characters=settings.max_extraction_characters,
                     )
                     application.state.processing_service = DocumentPipelineService(
                         parsing_service,
@@ -133,4 +137,5 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.middleware("http")(log_request)
 app.include_router(api_router, prefix="/api/v1")
