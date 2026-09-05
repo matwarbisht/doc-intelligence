@@ -13,6 +13,7 @@ from app.providers import (
     GeminiAnswerGenerator,
     GeminiEmbeddingProvider,
     GeminiSemanticExtractor,
+    SupabaseAuthenticationProvider,
     SupabaseObjectStorage,
     UnstructuredDocumentParser,
 )
@@ -20,9 +21,11 @@ from app.repositories import (
     PostgresDocumentRepository,
     PostgresEnrichmentRepository,
     PostgresProcessingRepository,
+    PostgresProfileRepository,
     PostgresQueryRepository,
 )
 from app.services import (
+    AuthenticationService,
     BoundedDocumentProcessor,
     CorpusQueryService,
     DocumentEnrichmentService,
@@ -39,12 +42,22 @@ LOCAL_CORS_ORIGIN_REGEX = r"^https?://(?:localhost|127\.0\.0\.1)(?::\d+)?$"
 
 @asynccontextmanager
 async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
+    application.state.authentication_service = None
     application.state.document_service = None
     application.state.processing_service = None
     application.state.query_service = None
     if settings.database_url and settings.supabase_url and settings.supabase_service_role_key:
         pool = await create_database_pool(settings.database_url)
         async with httpx.AsyncClient(timeout=30) as client:
+            if settings.supabase_publishable_key:
+                application.state.authentication_service = AuthenticationService(
+                    SupabaseAuthenticationProvider(
+                        client,
+                        supabase_url=settings.supabase_url,
+                        publishable_key=settings.supabase_publishable_key,
+                    ),
+                    PostgresProfileRepository(pool),
+                )
             storage = SupabaseObjectStorage(
                 client,
                 supabase_url=settings.supabase_url,

@@ -97,3 +97,33 @@ Phase 2 is complete when a fresh checkout can start Supabase, rebuild the schema
   bulk ingestion cannot fan out unlimited provider work.
 - Serialize Unstructured jobs independently, retry transient provider throttling, and
   keep document-detail polling active while an accepted retry waits for capacity.
+
+## Phase 10 — Authentication and abuse prevention (in progress)
+
+The detailed design and rollout checklist live in the
+[authentication and abuse-prevention plan](./authentication-and-abuse-prevention-plan.md).
+
+### Phase 10A — Identity and corpus ownership (complete)
+
+- Add public Supabase email/password sign-up, sign-in, persisted sessions, and sign-out.
+- Protect document, retry, and question-answering routes while keeping health endpoints public.
+- Validate bearer sessions authoritatively through Supabase Auth and block suspended profiles.
+- Attach refreshed access tokens in the shared API client with one bounded `401` retry.
+- Add document and query ownership, owner-prefixed object paths, and per-owner deduplication.
+- Scope every document lookup and retrieval branch to the authenticated user and return an
+  existence-safe `404` for another user's document.
+- Add cross-user isolation tests and verify the flow against the real local Supabase Auth stack.
+
+### Phase 10B — Ownership rollout and contract (complete)
+
+- Add a dry-run-capable command to assign pre-authentication data to an explicit operator UUID.
+- Verify there are no orphaned documents, queries, or mismatched document-scoped queries.
+- Enforce non-null ownership only after the backfill has been run in each existing environment.
+
+### Phase 10C — Abuse controls and operations (planned)
+
+- Add persisted feature switches for signup, uploads, processing, retries, and questions.
+- Add per-user and per-IP short-window rate limits plus daily upload, byte, retry, and query quotas.
+- Reserve provider work before scheduling it and keep retry/idempotency behavior quota-safe.
+- Add structured usage events, threshold alerts, operator commands, and incident runbooks.
+- Keep public signup available by default while preserving an authoritative emergency shutdown path.

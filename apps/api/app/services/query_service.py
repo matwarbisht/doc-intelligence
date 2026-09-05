@@ -43,7 +43,13 @@ class CorpusQueryService:
         self._candidate_limit = candidate_limit
         self._max_sources = max_sources
 
-    async def query(self, question: str, *, document_id: UUID | None = None) -> QueryResult:
+    async def query(
+        self,
+        question: str,
+        *,
+        user_id: UUID,
+        document_id: UUID | None = None,
+    ) -> QueryResult:
         normalized = " ".join(question.split())
         if not normalized:
             raise EmptyQueryError("Question must not be empty.")
@@ -52,12 +58,14 @@ class CorpusQueryService:
             keyword, semantic, structured = await asyncio.gather(
                 self._repository.search_keyword(
                     normalized,
+                    user_id=user_id,
                     document_id=document_id,
                     limit=self._candidate_limit,
                 ),
-                self._semantic_search(normalized, document_id=document_id),
+                self._semantic_search(normalized, user_id=user_id, document_id=document_id),
                 self._repository.search_structured(
                     normalized,
+                    user_id=user_id,
                     document_id=document_id,
                     limit=self._candidate_limit,
                 ),
@@ -86,6 +94,7 @@ class CorpusQueryService:
 
         result = QueryResult(
             id=uuid4(),
+            user_id=user_id,
             query=normalized,
             query_type=QueryType.HYBRID,
             document_id=document_id,
@@ -100,7 +109,7 @@ class CorpusQueryService:
         return result
 
     async def _semantic_search(
-        self, query: str, *, document_id: UUID | None
+        self, query: str, *, user_id: UUID, document_id: UUID | None
     ) -> tuple[RetrievalHit, ...]:
         vector = await self._embedding_provider.embed_query(query)
         return await self._repository.search_semantic(
@@ -108,6 +117,7 @@ class CorpusQueryService:
             provider=self._embedding_provider.provider_name,
             model_name=self._embedding_provider.model_name,
             dimension=self._embedding_provider.dimension,
+            user_id=user_id,
             document_id=document_id,
             limit=self._candidate_limit,
         )

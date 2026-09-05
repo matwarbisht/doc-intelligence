@@ -25,6 +25,61 @@ describe('document API client', () => {
     });
   });
 
+  it('adds the current bearer token to API requests', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ items: [], limit: 50, offset: 0 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createDocumentApiClient(
+      'http://api.test',
+      async () => 'access-token',
+    ).listDocuments();
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(init.headers).get('authorization')).toBe(
+      'Bearer access-token',
+    );
+  });
+
+  it('refreshes a rejected session once and retries with the new token', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ detail: 'Session expired.' }), {
+          status: 401,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [], limit: 50, offset: 0 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const tokenProvider = vi
+      .fn()
+      .mockResolvedValueOnce('expired-token')
+      .mockResolvedValueOnce('refreshed-token');
+
+    await createDocumentApiClient(
+      'http://api.test',
+      tokenProvider,
+    ).listDocuments();
+
+    expect(tokenProvider).toHaveBeenNthCalledWith(1);
+    expect(tokenProvider).toHaveBeenNthCalledWith(2, { forceRefresh: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const retryInit = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    expect(new Headers(retryInit.headers).get('authorization')).toBe(
+      'Bearer refreshed-token',
+    );
+  });
+
   it('sends uploads as multipart form data', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(

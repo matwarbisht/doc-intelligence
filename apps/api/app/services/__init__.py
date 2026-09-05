@@ -1,5 +1,6 @@
 """Application use-case services."""
 
+from app.services.authentication_service import AuthenticationService, SuspendedAccountError
 from app.services.document_service import (
     DocumentService,
     DocumentUpload,
@@ -22,6 +23,7 @@ from app.services.processing_service import (
 from app.services.query_service import CorpusQueryService, EmptyQueryError, QueryServiceError
 
 __all__ = [
+    "AuthenticationService",
     "CorpusQueryService",
     "BoundedDocumentProcessor",
     "DocumentService",
@@ -38,5 +40,6 @@ __all__ = [
     "ProcessingError",
     "ProcessingResult",
     "QueryServiceError",
+    "SuspendedAccountError",
     "UnsupportedDocumentTypeError",
 ]

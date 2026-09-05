@@ -29,10 +29,11 @@ class PostgresDocumentRepository:
         row = await self._pool.fetchrow(
             """
             insert into public.documents (
-                filename, mime_type, storage_path, content_hash, metadata
-            ) values ($1, $2, $3, $4, $5)
+                owner_id, filename, mime_type, storage_path, content_hash, metadata
+            ) values ($1, $2, $3, $4, $5, $6)
             returning *
             """,
+            document.owner_id,
             document.filename,
             document.mime_type,
             document.storage_path,
@@ -43,15 +44,18 @@ class PostgresDocumentRepository:
             raise RuntimeError("database did not return the created document")
         return self._to_document(row)
 
-    async def get(self, document_id: UUID) -> Document | None:
+    async def get(self, owner_id: UUID, document_id: UUID) -> Document | None:
         row = await self._pool.fetchrow(
-            "select * from public.documents where id = $1",
+            "select * from public.documents where owner_id = $1 and id = $2",
+            owner_id,
             document_id,
         )
         return None if row is None else self._to_document(row)
 
-    async def get_intelligence(self, document_id: UUID) -> DocumentIntelligence | None:
-        document = await self.get(document_id)
+    async def get_intelligence(
+        self, owner_id: UUID, document_id: UUID
+    ) -> DocumentIntelligence | None:
+        document = await self.get(owner_id, document_id)
         if document is None:
             return None
         version_id = await self._pool.fetchval(
@@ -146,9 +150,10 @@ class PostgresDocumentRepository:
             embedding_count=int(embedding_count or 0),
         )
 
-    async def get_by_content_hash(self, content_hash: str) -> Document | None:
+    async def get_by_content_hash(self, owner_id: UUID, content_hash: str) -> Document | None:
         row = await self._pool.fetchrow(
-            "select * from public.documents where content_hash = $1",
+            "select * from public.documents where owner_id = $1 and content_hash = $2",
+            owner_id,
             content_hash,
         )
         return None if row is None else self._to_document(row)
@@ -159,10 +164,11 @@ class PostgresDocumentRepository:
                 row = await connection.fetchrow(
                     """
                     insert into public.documents (
-                        filename, mime_type, storage_path, content_hash, metadata
-                    ) values ($1, $2, $3, $4, $5)
+                        owner_id, filename, mime_type, storage_path, content_hash, metadata
+                    ) values ($1, $2, $3, $4, $5, $6)
                     returning *
                     """,
+                    document.owner_id,
                     document.filename,
                     document.mime_type,
                     document.storage_path,
@@ -203,7 +209,7 @@ class PostgresDocumentRepository:
             raise RuntimeError("database did not return the queued document")
         return self._to_document(queued_row)
 
-    async def list(self, *, limit: int = 50, offset: int = 0) -> list[Document]:
+    async def list(self, owner_id: UUID, *, limit: int = 50, offset: int = 0) -> list[Document]:
         if limit < 1 or limit > 100:
             raise ValueError("limit must be between 1 and 100")
         if offset < 0:
@@ -212,9 +218,11 @@ class PostgresDocumentRepository:
         rows = await self._pool.fetch(
             """
             select * from public.documents
+            where owner_id = $1
             order by created_at desc, id desc
-            limit $1 offset $2
+            limit $2 offset $3
             """,
+            owner_id,
             limit,
             offset,
         )

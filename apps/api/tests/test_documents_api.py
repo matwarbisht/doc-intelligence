@@ -2,19 +2,30 @@
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false
 
+from uuid import UUID
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.api.dependencies import get_document_service
+from app.api.dependencies import get_current_user, get_document_service
 from app.api.routes.documents import router
+from app.domain import AuthenticatedUser
 from app.services import DocumentService
 from tests.fakes import InMemoryDocumentRepository, InMemoryObjectStorage
+
+TEST_USER = AuthenticatedUser(
+    id=UUID("10000000-0000-4000-8000-000000000001"), email="alice@example.test"
+)
+OTHER_USER = AuthenticatedUser(
+    id=UUID("20000000-0000-4000-8000-000000000002"), email="bob@example.test"
+)
 
 
 def create_test_client(service: DocumentService) -> tuple[FastAPI, TestClient]:
     application = FastAPI()
     application.include_router(router, prefix="/api/v1")
     application.dependency_overrides[get_document_service] = lambda: service
+    application.dependency_overrides[get_current_user] = lambda: TEST_USER
     return application, TestClient(application)
 
 
@@ -118,3 +129,54 @@ def test_process_endpoint_requires_a_configured_parser() -> None:
 
     assert response.status_code == 503
     assert response.json() == {"detail": "Document parsing is not configured."}
+
+
+def test_document_routes_require_authentication() -> None:
+    application = FastAPI()
+    application.include_router(router, prefix="/api/v1")
+    application.dependency_overrides[get_document_service] = lambda: DocumentService(
+        InMemoryDocumentRepository(), InMemoryObjectStorage()
+    )
+    client = TestClient(application)
+
+    try:
+        response = client.get("/api/v1/documents")
+    finally:
+        client.close()
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Authentication is required."}
+
+
+def test_users_cannot_see_or_deduplicate_each_others_documents() -> None:
+    repository = InMemoryDocumentRepository()
+    service = DocumentService(repository, InMemoryObjectStorage())
+    application = FastAPI()
+    application.include_router(router, prefix="/api/v1")
+    application.dependency_overrides[get_document_service] = lambda: service
+    current_user = {"value": TEST_USER}
+    application.dependency_overrides[get_current_user] = lambda: current_user["value"]
+    client = TestClient(application)
+
+    try:
+        alice_upload = client.post(
+            "/api/v1/documents",
+            files={"file": ("alice.txt", b"private content", "text/plain")},
+        ).json()
+        current_user["value"] = OTHER_USER
+        bob_list = client.get("/api/v1/documents")
+        bob_detail = client.get(f"/api/v1/documents/{alice_upload['document']['id']}")
+        bob_upload = client.post(
+            "/api/v1/documents",
+            files={"file": ("bob.txt", b"private content", "text/plain")},
+        )
+    finally:
+        client.close()
+        application.dependency_overrides.clear()
+
+    assert bob_list.json()["items"] == []
+    assert bob_detail.status_code == 404
+    assert bob_upload.status_code == 201
+    assert bob_upload.json()["duplicate"] is False
+    assert bob_upload.json()["document"]["id"] != alice_upload["document"]["id"]

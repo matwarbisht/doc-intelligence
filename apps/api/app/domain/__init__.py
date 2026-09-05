@@ -1,6 +1,7 @@
 """Application-owned document intelligence domain models."""
 
 from app.domain.models import (
+    AuthenticatedUser,
     CanonicalDocument,
     CanonicalElement,
     Chunk,
@@ -31,6 +32,8 @@ from app.domain.models import (
     NewDocument,
     ProcessingJob,
     ProcessingStage,
+    Profile,
+    ProfileStatus,
     QueryResult,
     QueryType,
     Relationship,
@@ -41,6 +44,7 @@ from app.domain.models import (
 )
 
 __all__ = [
+    "AuthenticatedUser",
     "CanonicalDocument",
     "CanonicalElement",
     "Chunk",
@@ -70,6 +74,8 @@ __all__ = [
     "NewDocument",
     "ProcessingJob",
     "ProcessingStage",
+    "Profile",
+    "ProfileStatus",
     "QueryType",
     "QueryResult",
     "Relationship",

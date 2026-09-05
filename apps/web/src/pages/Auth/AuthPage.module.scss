@@ -1,0 +1,86 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 28rem);
+  gap: var(--space-16);
+  align-items: center;
+  width: min(72rem, calc(100% - var(--space-12)));
+  min-height: calc(100vh - var(--space-16));
+  margin-inline: auto;
+  padding-block: var(--space-16);
+}
+
+.introduction {
+  max-width: 38rem;
+
+  h1 {
+    margin: var(--space-3) 0 var(--space-5);
+    font-size: clamp(3rem, 7vw, 5.5rem);
+    line-height: 0.92;
+    letter-spacing: var(--letter-spacing-tight);
+  }
+
+  > p:last-child {
+    max-width: 32rem;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-lg);
+    line-height: var(--line-height-relaxed);
+  }
+}
+
+.eyebrow {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.card {
+  padding: var(--space-8);
+
+  form {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  label {
+    margin-top: var(--space-2);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+  }
+
+  button {
+    width: 100%;
+    margin-top: var(--space-3);
+  }
+}
+
+.error {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
+  color: var(--color-danger);
+  background: var(--color-danger-subtle);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+.alternative {
+  margin: var(--space-6) 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  text-align: center;
+
+  a {
+    color: var(--color-text-primary);
+    font-weight: var(--font-weight-semibold);
+  }
+}
+
+@media (max-width: 48rem) {
+  .page {
+    grid-template-columns: 1fr;
+    gap: var(--space-8);
+    width: min(32rem, calc(100% - var(--space-8)));
+  }
+}

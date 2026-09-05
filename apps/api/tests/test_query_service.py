@@ -11,6 +11,8 @@ from app.domain import (
 )
 from app.services import CorpusQueryService, EmptyQueryError
 
+TEST_USER_ID = UUID("10000000-0000-4000-8000-000000000001")
+
 
 def hit(chunk_id: UUID, match_type: QueryType, filename: str) -> RetrievalHit:
     return RetrievalHit(
@@ -36,8 +38,9 @@ class FakeQueryRepository:
         self.structured_document_id: UUID | None = None
 
     async def search_keyword(  # type: ignore[no-untyped-def]
-        self, query: str, *, document_id: UUID | None, limit: int
+        self, query: str, *, user_id: UUID, document_id: UUID | None, limit: int
     ):
+        assert user_id == TEST_USER_ID
         self.keyword_document_id = document_id
         return self.keyword
 
@@ -46,8 +49,9 @@ class FakeQueryRepository:
         return self.semantic
 
     async def search_structured(  # type: ignore[no-untyped-def]
-        self, query: str, *, document_id: UUID | None, limit: int
+        self, query: str, *, user_id: UUID, document_id: UUID | None, limit: int
     ):
+        assert user_id == TEST_USER_ID
         self.structured_document_id = document_id
         return self.structured
 
@@ -101,10 +105,11 @@ async def test_query_fuses_retrieval_and_persists_only_cited_sources() -> None:
         max_sources=3,
     )
 
-    result = await service.query("  How much did Acme grow?  ")
+    result = await service.query("  How much did Acme grow?  ", user_id=TEST_USER_ID)
 
     assert result.query == "How much did Acme grow?"
     assert result.query_type is QueryType.HYBRID
+    assert result.user_id == TEST_USER_ID
     assert result.answer == "The notes describe the change [2]."
     assert [source.chunk_id for source in result.sources] == [semantic_only]
     assert result.sources[0].citation_number == 2
@@ -118,7 +123,7 @@ async def test_document_scope_is_applied_to_every_retriever_and_history() -> Non
     repository = FakeQueryRepository((), (), ())
     service = CorpusQueryService(repository, FakeQueryEmbeddings(), FakeAnswerGenerator())
 
-    result = await service.query("What changed?", document_id=document_id)
+    result = await service.query("What changed?", user_id=TEST_USER_ID, document_id=document_id)
 
     assert repository.keyword_document_id == document_id
     assert repository.semantic_request["document_id"] == document_id
@@ -136,7 +141,7 @@ async def test_empty_query_is_rejected_before_provider_calls() -> None:
     )
 
     with pytest.raises(EmptyQueryError):
-        await service.query("   ")
+        await service.query("   ", user_id=TEST_USER_ID)
 
 
 @pytest.mark.asyncio
@@ -144,7 +149,7 @@ async def test_no_evidence_returns_a_deterministic_answer() -> None:
     repository = FakeQueryRepository((), (), ())
     service = CorpusQueryService(repository, FakeQueryEmbeddings(), FakeAnswerGenerator())
 
-    result = await service.query("What is missing?")
+    result = await service.query("What is missing?", user_id=TEST_USER_ID)
 
     assert result.sources == ()
     assert "couldn't find enough evidence" in result.answer

@@ -1,12 +1,24 @@
 -- Deterministic, synthetic records for local UI and persistence development.
 -- Schema belongs in migrations; this file contains data only.
 
+-- Placeholder identity for deterministic data ownership. It intentionally has no password;
+-- create a login-capable account through local Supabase Auth when testing sign-in.
+insert into auth.users (id, email, raw_user_meta_data, raw_app_meta_data)
+values (
+  '00000000-0000-4000-8000-000000000001',
+  'seed-user@example.test',
+  '{}'::jsonb,
+  '{}'::jsonb
+)
+on conflict (id) do nothing;
+
 insert into public.documents (
   id,
   filename,
   mime_type,
   storage_path,
   content_hash,
+  owner_id,
   status,
   metadata
 )
@@ -16,6 +28,7 @@ values (
   'text/plain',
   'seed/acme-quarterly-update.txt',
   'seed:acme-quarterly-update-v1',
+  '00000000-0000-4000-8000-000000000001',
   'ready',
   '{"seeded": true, "description": "Synthetic local development document"}'::jsonb
 )

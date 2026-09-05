@@ -91,7 +91,26 @@ class QueryType(StrEnum):
     HYBRID = "hybrid"
 
 
+class ProfileStatus(StrEnum):
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
+
+
+class AuthenticatedUser(DomainModel):
+    id: UUID
+    email: str | None = None
+
+
+class Profile(DomainModel):
+    user_id: UUID
+    status: ProfileStatus
+    display_name: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
 class NewDocument(DomainModel):
+    owner_id: UUID
     filename: Annotated[str, Field(min_length=1)]
     mime_type: Annotated[str, Field(min_length=1)]
     storage_path: Annotated[str, Field(min_length=1)]
@@ -398,6 +417,7 @@ class GeneratedAnswer(DomainModel):
 
 class QueryResult(DomainModel):
     id: UUID
+    user_id: UUID
     query: Annotated[str, Field(min_length=1)]
     query_type: QueryType
     document_id: UUID | None = None

@@ -1,8 +1,4 @@
-import {
-  createDocumentApiClient,
-  DEFAULT_API_BASE_URL,
-  type DocumentRecord,
-} from '@doc-intelligence/api-client';
+import { type DocumentRecord } from '@doc-intelligence/api-client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useId,
@@ -13,13 +9,11 @@ import {
 } from 'react';
 import { Link } from 'react-router';
 
+import { api } from '../../api/client';
 import { Button } from '../../components/Button/Button';
 import { Card } from '../../components/Card/Card';
 import styles from './DocumentsPage.module.scss';
 
-const api = createDocumentApiClient(
-  import.meta.env.VITE_API_URL ?? DEFAULT_API_BASE_URL,
-);
 const documentsQueryKey = ['documents'] as const;
 const uploadConcurrency = 3;
 

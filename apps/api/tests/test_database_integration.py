@@ -1,6 +1,6 @@
 import os
 from contextlib import suppress
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import asyncpg
 import httpx
@@ -35,6 +35,7 @@ from app.services import (
 )
 
 pytestmark = pytest.mark.integration
+TEST_OWNER_ID = UUID("00000000-0000-4000-8000-000000000001")
 
 
 class IntegrationParser:
@@ -193,6 +194,7 @@ async def test_upload_persists_private_object_and_queued_lifecycle() -> None:
         service = DocumentService(PostgresDocumentRepository(pool), storage)
         try:
             result = await service.upload(
+                owner_id=TEST_OWNER_ID,
                 filename="integration-test.txt",
                 content_type="text/plain",
                 content=content,
@@ -266,6 +268,7 @@ async def test_parsing_persists_canonical_elements_chunks_and_next_stage() -> No
         )
         try:
             upload = await document_service.upload(
+                owner_id=TEST_OWNER_ID,
                 filename="integration-parse.txt",
                 content_type="text/plain",
                 content=f"Integration parse {uuid4()}".encode(),
@@ -352,6 +355,7 @@ async def test_enrichment_persists_semantics_embeddings_and_ready_state() -> Non
         documents = PostgresDocumentRepository(pool)
         try:
             upload = await DocumentService(documents, storage).upload(
+                owner_id=TEST_OWNER_ID,
                 filename="integration-parse.txt",
                 content_type="text/plain",
                 content=f"Integration enrichment {uuid4()}".encode(),
@@ -366,21 +370,28 @@ async def test_enrichment_persists_semantics_embeddings_and_ready_state() -> Non
                 IntegrationExtractor(),
                 IntegrationEmbeddings(),
             ).process_document(upload.document.id)
-            detail = await documents.get_intelligence(upload.document.id)
+            detail = await documents.get_intelligence(TEST_OWNER_ID, upload.document.id)
             queries = PostgresQueryRepository(pool)
             keyword_hits = await queries.search_keyword(
-                "provenance", document_id=upload.document.id, limit=5
+                "provenance",
+                user_id=TEST_OWNER_ID,
+                document_id=upload.document.id,
+                limit=5,
             )
             semantic_hits = await queries.search_semantic(
                 (1.0,) + (0.0,) * 767,
                 provider="gemini",
                 model_name="integration-embedding",
                 dimension=768,
+                user_id=TEST_OWNER_ID,
                 document_id=upload.document.id,
                 limit=5,
             )
             structured_hits = await queries.search_structured(
-                "Canonical output", document_id=upload.document.id, limit=5
+                "Canonical output",
+                user_id=TEST_OWNER_ID,
+                document_id=upload.document.id,
+                limit=5,
             )
             query_result = await CorpusQueryService(
                 queries,
@@ -388,6 +399,7 @@ async def test_enrichment_persists_semantics_embeddings_and_ready_state() -> Non
                 IntegrationAnswerGenerator(),
             ).query(
                 "What does the canonical output retain?",
+                user_id=TEST_OWNER_ID,
                 document_id=upload.document.id,
             )
             query_id = query_result.id

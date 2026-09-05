@@ -16,26 +16,29 @@ class InMemoryDocumentRepository:
     async def create_queued(self, document: NewDocument) -> Document:
         return self._save(document, DocumentStatus.QUEUED)
 
-    async def get(self, document_id: UUID) -> Document | None:
-        return self.documents.get(document_id)
-
-    async def get_intelligence(self, document_id: UUID) -> DocumentIntelligence | None:
+    async def get(self, owner_id: UUID, document_id: UUID) -> Document | None:
         document = self.documents.get(document_id)
+        return document if document is not None and document.owner_id == owner_id else None
+
+    async def get_intelligence(
+        self, owner_id: UUID, document_id: UUID
+    ) -> DocumentIntelligence | None:
+        document = await self.get(owner_id, document_id)
         return None if document is None else DocumentIntelligence(document=document)
 
-    async def get_by_content_hash(self, content_hash: str) -> Document | None:
+    async def get_by_content_hash(self, owner_id: UUID, content_hash: str) -> Document | None:
         return next(
             (
                 document
                 for document in self.documents.values()
-                if document.content_hash == content_hash
+                if document.owner_id == owner_id and document.content_hash == content_hash
             ),
             None,
         )
 
-    async def list(self, *, limit: int = 50, offset: int = 0) -> list[Document]:
+    async def list(self, owner_id: UUID, *, limit: int = 50, offset: int = 0) -> list[Document]:
         documents = sorted(
-            self.documents.values(),
+            (document for document in self.documents.values() if document.owner_id == owner_id),
             key=lambda document: (document.created_at, document.id),
             reverse=True,
         )

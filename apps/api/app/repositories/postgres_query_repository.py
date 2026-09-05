@@ -18,7 +18,12 @@ class PostgresQueryRepository:
         self._pool = pool
 
     async def search_keyword(
-        self, query: str, *, document_id: UUID | None = None, limit: int
+        self,
+        query: str,
+        *,
+        user_id: UUID,
+        document_id: UUID | None = None,
+        limit: int,
     ) -> tuple[RetrievalHit, ...]:
         rows = await self._pool.fetch(
             f"""
@@ -27,15 +32,16 @@ class PostgresQueryRepository:
             from public.chunks c
             join public.document_versions dv on dv.id=c.document_version_id
             join public.documents d on d.id=dv.document_id
-            where d.status='ready'
-              and ($2::uuid is null or d.id=$2)
+            where d.status='ready' and d.owner_id=$2
+              and ($3::uuid is null or d.id=$3)
               and dv.id=(select latest.id from public.document_versions latest
                          where latest.document_id=d.id order by latest.version desc limit 1)
               and c.search_vector @@ websearch_to_tsquery('simple', $1)
             order by score desc, c.id
-            limit $3
+            limit $4
             """,
             query,
+            user_id,
             document_id,
             limit,
         )
@@ -48,6 +54,7 @@ class PostgresQueryRepository:
         provider: str,
         model_name: str,
         dimension: int,
+        user_id: UUID,
         document_id: UUID | None = None,
         limit: int,
     ) -> tuple[RetrievalHit, ...]:
@@ -64,23 +71,30 @@ class PostgresQueryRepository:
             join public.document_versions dv on dv.id=c.document_version_id
             join public.documents d on d.id=dv.document_id
             where d.status='ready' and ce.provider=$2 and ce.model_name=$3 and ce.dimension=$4
-              and ($5::uuid is null or d.id=$5)
+              and d.owner_id=$5
+              and ($6::uuid is null or d.id=$6)
               and dv.id=(select latest.id from public.document_versions latest
                          where latest.document_id=d.id order by latest.version desc limit 1)
             order by ce.embedding::{vector_type} <=> $1::text::{vector_type}, c.id
-            limit $6
+            limit $7
             """,
             vector_text,
             provider,
             model_name,
             dimension,
+            user_id,
             document_id,
             limit,
         )
         return self._hits(rows, QueryType.SEMANTIC)
 
     async def search_structured(
-        self, query: str, *, document_id: UUID | None = None, limit: int
+        self,
+        query: str,
+        *,
+        user_id: UUID,
+        document_id: UUID | None = None,
+        limit: int,
     ) -> tuple[RetrievalHit, ...]:
         rows = await self._pool.fetch(
             f"""
@@ -115,15 +129,16 @@ class PostgresQueryRepository:
             join public.chunks c on c.id=mc.chunk_id
             join public.document_versions dv on dv.id=c.document_version_id
             join public.documents d on d.id=dv.document_id
-            where d.status='ready'
-              and ($2::uuid is null or d.id=$2)
+            where d.status='ready' and d.owner_id=$2
+              and ($3::uuid is null or d.id=$3)
               and dv.id=(select latest.id from public.document_versions latest
                          where latest.document_id=d.id order by latest.version desc limit 1)
             group by c.id, d.id
             order by score desc, c.id
-            limit $3
+            limit $4
             """,
             query,
+            user_id,
             document_id,
             limit,
         )
@@ -133,10 +148,11 @@ class PostgresQueryRepository:
         await self._pool.execute(
             """
             insert into public.queries
-              (id, query_text, query_type, document_id, response, created_at)
-            values ($1, $2, $3, $4, $5, $6)
+              (id, user_id, query_text, query_type, document_id, response, created_at)
+            values ($1, $2, $3, $4, $5, $6, $7)
             """,
             result.id,
+            result.user_id,
             result.query,
             result.query_type.value,
             result.document_id,

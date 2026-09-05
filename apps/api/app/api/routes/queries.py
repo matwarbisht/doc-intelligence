@@ -4,22 +4,38 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.dependencies import get_query_service
+from app.api.dependencies import get_current_user, get_document_service, get_query_service
+from app.domain import AuthenticatedUser
 from app.providers import AnswerGeneratorError, EmbeddingProviderError
 from app.schemas.queries import CorpusQueryRequest, CorpusQueryResponse
-from app.services import CorpusQueryService, EmptyQueryError, QueryServiceError
+from app.services import CorpusQueryService, DocumentService, EmptyQueryError, QueryServiceError
 
 router = APIRouter(prefix="/query")
 QueryServiceDependency = Annotated[CorpusQueryService, Depends(get_query_service)]
+CurrentUserDependency = Annotated[AuthenticatedUser, Depends(get_current_user)]
+DocumentServiceDependency = Annotated[DocumentService, Depends(get_document_service)]
 
 
 @router.post("", response_model=CorpusQueryResponse)
 async def query_corpus(
     payload: CorpusQueryRequest,
     service: QueryServiceDependency,
+    document_service: DocumentServiceDependency,
+    current_user: CurrentUserDependency,
 ) -> CorpusQueryResponse:
+    if payload.document_id is not None:
+        document = await document_service.get_document(current_user.id, payload.document_id)
+        if document is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found.",
+            )
     try:
-        result = await service.query(payload.query, document_id=payload.document_id)
+        result = await service.query(
+            payload.query,
+            user_id=current_user.id,
+            document_id=payload.document_id,
+        )
     except EmptyQueryError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
     except (QueryServiceError, AnswerGeneratorError, EmbeddingProviderError) as error:

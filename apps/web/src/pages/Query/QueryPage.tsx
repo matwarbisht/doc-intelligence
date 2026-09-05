@@ -1,20 +1,13 @@
-import {
-  ApiError,
-  createDocumentApiClient,
-  DEFAULT_API_BASE_URL,
-} from '@doc-intelligence/api-client';
+import { ApiError } from '@doc-intelligence/api-client';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 
+import { api as client } from '../../api/client';
 import { Button } from '../../components/Button/Button';
 import { Card } from '../../components/Card/Card';
 import { Input } from '../../components/Input/Input';
 import styles from './QueryPage.module.scss';
-
-const client = createDocumentApiClient(
-  import.meta.env.VITE_API_URL ?? DEFAULT_API_BASE_URL,
-);
 
 export function QueryPage() {
   const [question, setQuestion] = useState('');

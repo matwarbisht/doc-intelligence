@@ -343,3 +343,43 @@ New decisions should be appended when a choice meaningfully affects architecture
 **The reasoning** — Uvicorn's reload process outlived the launcher long enough for a restart to fail with “address already in use”; after that old process exited, Vite remained available while no API was running. Process-group cleanup covers reload descendants, early port checks explain conflicts before a partial stack starts, and sibling supervision prevents a working UI shell from masking an API startup failure. Refusing to kill an unknown port owner avoids disrupting unrelated local work.
 
 **What we deliberately cut** — Automatic port reassignment, automatic termination of unknown processes, Docker Compose for the application services, and a general-purpose process supervisor. Fixed URLs and a small shell launcher remain appropriate for this local MVP.
+
+## D035 — Use Supabase Auth for public email/password accounts
+
+**The decision** — Use Supabase Auth for public email/password signup and sessions, with an application-owned `profiles` row for active or suspended state. Keep signup enabled during the limited test and protect product routes in both the React router and FastAPI.
+
+**The alternatives** — Build password storage and sessions in FastAPI; use a shared tester password; disable public signup and provision every tester manually; or start with magic links and OAuth.
+
+**The reasoning** — Authentication is now a data-isolation boundary, not merely a launch gate. Supabase is already part of the stack and provides password hashing, session refresh, and future identity methods without putting credential handling in our application. A separate profile keeps product policy such as suspension independent from the identity provider record.
+
+**What we deliberately cut** — Email confirmation, password recovery, magic links, OAuth, account linking, organizations, and an account-settings screen. The model keeps an immutable provider user UUID so those can be added without changing document ownership.
+
+## D036 — Make ownership explicit at document and query boundaries
+
+**The decision** — Store `documents.owner_id` and `queries.user_id`; derive ownership of versions, chunks, extraction records, and embeddings through their parent document. Scope every repository lookup and retrieval branch before returning or ranking data, prefix new storage objects by user, and deduplicate content only inside one user's corpus.
+
+**The alternatives** — Add `user_id` to every derived table; infer ownership from storage paths; keep global deduplication; or rely on frontend filtering and database RLS alone.
+
+**The reasoning** — The document is the aggregate root for all processed knowledge, so one authoritative owner avoids denormalized ownership becoming inconsistent. Backend filters remain the primary boundary because the API's privileged database connection is not protected by browser RLS. Per-owner hashes also avoid revealing that another user uploaded the same bytes.
+
+**What we deliberately cut** — Shared documents, workspaces, memberships, ownership transfers, and direct browser database access. Existing pre-authentication rows remain nullable and invisible until an explicit backfill owner is selected; a later contract migration will make ownership non-null.
+
+## D037 — Validate sessions through Supabase Auth before optimizing with JWKS
+
+**The decision** — Validate each API bearer token through Supabase Auth's user endpoint behind an `AuthenticationProvider` interface. Distinguish rejected sessions (`401`), suspended accounts (`403`), missing resources (`404`), and identity-provider outages (`503`). Let the shared API client refresh once after a `401` and retry exactly once.
+
+**The alternatives** — Decode tokens without signature validation; immediately implement local JWT/JWKS verification; trust browser session state; or retry unauthorized requests indefinitely.
+
+**The reasoning** — Supabase's authoritative endpoint works for the local HS256 configuration as well as hosted projects and validates the complete provider session contract. The provider boundary preserves a future move to cached JWKS verification if the added network hop becomes material. One refresh retry handles ordinary expiry without loops or duplicated unbounded traffic.
+
+**What we deliberately cut** — A distributed token cache, local JWKS caching, device/session administration, token revocation lists, and custom access claims. We need measured hosted latency and traffic before accepting their added security and invalidation complexity.
+
+## D038 — Contract ownership only after an explicit transactional backfill
+
+**The decision** — Keep the ownership expansion and database contract as separate migrations. Require an operator-selected Supabase user UUID, inspect legacy counts without writing by default, assign only null ownership in one locked transaction, and make the later migration abort unless every document and query is owned and every scoped query matches its document owner.
+
+**The alternatives** — Hard-code the first user into a migration; delete legacy records; leave ownership nullable indefinitely; infer an owner from email or timestamps; or silently assign records while deploying the application.
+
+**The reasoning** — A repository migration cannot know who legitimately owns a pre-authentication corpus. An explicit dry run makes that human decision visible, while table locks and post-write verification prevent concurrent inserts from creating a gap during assignment. The final non-null and composite foreign-key constraints then turn the application rule into a database invariant.
+
+**What we deliberately cut** — Automatic storage-object moves, owner guessing, a general ownership-transfer interface, and multi-user distribution of the legacy corpus. The safe MVP operation assigns the known single-user corpus to one reviewed account; future sharing needs workspace semantics rather than another one-off backfill.

@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     )
     database_url: str | None = None
     supabase_url: str | None = None
+    supabase_publishable_key: str | None = None
     supabase_service_role_key: str | None = None
     supabase_storage_bucket: str = "documents"
     max_upload_bytes: int = 50 * 1024 * 1024

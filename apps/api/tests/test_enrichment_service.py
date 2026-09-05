@@ -113,6 +113,7 @@ def claims() -> tuple[EnrichmentClaim, EmbeddingClaim]:
     document_id, version_id = uuid4(), uuid4()
     document = Document(
         id=document_id,
+        owner_id=uuid4(),
         filename="report.txt",
         mime_type="text/plain",
         storage_path="originals/report.txt",

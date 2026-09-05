@@ -66,6 +66,7 @@ class DocumentService:
     async def upload(
         self,
         *,
+        owner_id: UUID,
         filename: str,
         content_type: str | None,
         content: bytes,
@@ -81,11 +82,13 @@ class DocumentService:
         normalized_content_type = self._content_type(normalized_filename, content_type)
         content_hash = hashlib.sha256(content).hexdigest()
 
-        existing = await self._repository.get_by_content_hash(content_hash)
+        existing = await self._repository.get_by_content_hash(owner_id, content_hash)
         if existing is not None:
             return DocumentUpload(document=existing, duplicate=True)
 
-        storage_path = f"originals/{uuid4()}/{self._storage_filename(normalized_filename)}"
+        document_key = uuid4()
+        storage_filename = self._storage_filename(normalized_filename)
+        storage_path = f"users/{owner_id}/documents/{document_key}/{storage_filename}"
         await self._storage.upload(
             storage_path,
             content,
@@ -95,6 +98,7 @@ class DocumentService:
         try:
             document = await self._repository.create_queued(
                 NewDocument(
+                    owner_id=owner_id,
                     filename=normalized_filename,
                     mime_type=normalized_content_type,
                     storage_path=storage_path,
@@ -104,7 +108,7 @@ class DocumentService:
             )
         except DuplicateDocumentError:
             await self._cleanup_storage(storage_path)
-            existing = await self._repository.get_by_content_hash(content_hash)
+            existing = await self._repository.get_by_content_hash(owner_id, content_hash)
             if existing is None:
                 raise
             return DocumentUpload(document=existing, duplicate=True)
@@ -114,14 +118,18 @@ class DocumentService:
 
         return DocumentUpload(document=document, duplicate=False)
 
-    async def list_documents(self, *, limit: int = 50, offset: int = 0) -> list[Document]:
-        return await self._repository.list(limit=limit, offset=offset)
+    async def list_documents(
+        self, owner_id: UUID, *, limit: int = 50, offset: int = 0
+    ) -> list[Document]:
+        return await self._repository.list(owner_id, limit=limit, offset=offset)
 
-    async def get_document(self, document_id: UUID) -> Document | None:
-        return await self._repository.get(document_id)
+    async def get_document(self, owner_id: UUID, document_id: UUID) -> Document | None:
+        return await self._repository.get(owner_id, document_id)
 
-    async def get_document_intelligence(self, document_id: UUID) -> DocumentIntelligence | None:
-        return await self._repository.get_intelligence(document_id)
+    async def get_document_intelligence(
+        self, owner_id: UUID, document_id: UUID
+    ) -> DocumentIntelligence | None:
+        return await self._repository.get_intelligence(owner_id, document_id)
 
     async def _cleanup_storage(self, storage_path: str) -> None:
         with suppress(ObjectStorageError):

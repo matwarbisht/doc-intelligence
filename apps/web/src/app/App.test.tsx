@@ -1,11 +1,22 @@
 import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
 
 import { App } from './App';
 
+function renderApp(children: ReactNode) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>,
+  );
+}
+
 describe('App', () => {
   it('renders the product foundation', () => {
-    render(
+    renderApp(
       <MemoryRouter>
         <App />
       </MemoryRouter>,
@@ -19,7 +30,7 @@ describe('App', () => {
   });
 
   it('exposes the design-system playground', () => {
-    render(
+    renderApp(
       <MemoryRouter initialEntries={['/style-guide']}>
         <App />
       </MemoryRouter>,

@@ -157,14 +157,44 @@ export interface DocumentApiClient {
   ): Promise<DocumentProcessResponse>;
 }
 
+export interface AccessTokenRequest {
+  forceRefresh?: boolean;
+}
+
+export type AccessTokenProvider = (
+  options?: AccessTokenRequest,
+) => string | null | Promise<string | null>;
+
 export function createDocumentApiClient(
   baseUrl: string = DEFAULT_API_BASE_URL,
+  getAccessToken?: AccessTokenProvider,
 ): DocumentApiClient {
   const apiUrl = baseUrl.replace(/\/$/, '');
+  const authenticatedRequest = async <T>(url: string, init?: RequestInit) => {
+    const accessToken = await getAccessToken?.();
+    if (!accessToken) return request<T>(url, init);
+    const headers = new Headers(init?.headers);
+    headers.set('authorization', `Bearer ${accessToken}`);
+    try {
+      return await request<T>(url, { ...init, headers });
+    } catch (error) {
+      if (
+        !(error instanceof ApiError) ||
+        error.status !== 401 ||
+        !getAccessToken
+      ) {
+        throw error;
+      }
+      const refreshedToken = await getAccessToken({ forceRefresh: true });
+      if (!refreshedToken) throw error;
+      headers.set('authorization', `Bearer ${refreshedToken}`);
+      return request<T>(url, { ...init, headers });
+    }
+  };
 
   return {
     queryCorpus: (query, { documentId, signal } = {}) =>
-      request<CorpusQueryResponse>(`${apiUrl}/api/v1/query`, {
+      authenticatedRequest<CorpusQueryResponse>(`${apiUrl}/api/v1/query`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -175,10 +205,12 @@ export function createDocumentApiClient(
       }),
 
     listDocuments: ({ signal } = {}) =>
-      request<DocumentListResponse>(`${apiUrl}/api/v1/documents`, { signal }),
+      authenticatedRequest<DocumentListResponse>(`${apiUrl}/api/v1/documents`, {
+        signal,
+      }),
 
     getDocument: (id, { signal } = {}) =>
-      request<DocumentDetail>(
+      authenticatedRequest<DocumentDetail>(
         `${apiUrl}/api/v1/documents/${encodeURIComponent(id)}`,
         { signal },
       ),
@@ -186,15 +218,18 @@ export function createDocumentApiClient(
     uploadDocument: (file, { signal } = {}) => {
       const body = new FormData();
       body.append('file', file);
-      return request<DocumentUploadResponse>(`${apiUrl}/api/v1/documents`, {
-        method: 'POST',
-        body,
-        signal,
-      });
+      return authenticatedRequest<DocumentUploadResponse>(
+        `${apiUrl}/api/v1/documents`,
+        {
+          method: 'POST',
+          body,
+          signal,
+        },
+      );
     },
 
     processDocument: (id, { signal } = {}) =>
-      request<DocumentProcessResponse>(
+      authenticatedRequest<DocumentProcessResponse>(
         `${apiUrl}/api/v1/documents/${encodeURIComponent(id)}/process`,
         { method: 'POST', signal },
       ),

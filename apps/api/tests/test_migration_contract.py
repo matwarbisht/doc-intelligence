@@ -5,6 +5,8 @@ SCHEMA = MIGRATIONS / "20260903010000_initial_document_schema.sql"
 STORAGE = MIGRATIONS / "20260903010100_create_documents_bucket.sql"
 PROCESSING = MIGRATIONS / "20260904010000_processing_pipeline_constraints.sql"
 SEMANTIC_INDEXES = MIGRATIONS / "20260904020000_semantic_indexes.sql"
+AUTHENTICATION = MIGRATIONS / "20260905020000_add_authentication_and_ownership.sql"
+OWNERSHIP_CONTRACT = MIGRATIONS / "20260905020100_enforce_document_ownership.sql"
 SEED = MIGRATIONS.parent / "seed.sql"
 
 
@@ -67,3 +69,25 @@ def test_semantic_indexes_support_gemini_vector_retrieval() -> None:
 
     assert "chunk_embeddings_gemini_768_cosine_idx" in sql
     assert "vector_cosine_ops" in sql
+
+
+def test_authentication_migration_expands_ownership_without_forcing_a_backfill_user() -> None:
+    sql = AUTHENTICATION.read_text()
+
+    assert "create table public.profiles" in sql
+    assert "add column owner_id uuid references auth.users" in sql
+    assert "add column user_id uuid references auth.users" in sql
+    assert "documents_owner_content_hash_key" in sql
+    assert "alter column owner_id set not null" not in sql
+    assert "alter column user_id set not null" not in sql
+
+
+def test_ownership_contract_refuses_orphans_and_enforces_scoped_query_ownership() -> None:
+    sql = OWNERSHIP_CONTRACT.read_text()
+
+    assert "documents.owner_id still contains null values" in sql
+    assert "queries.user_id still contains null values" in sql
+    assert "alter column owner_id set not null" in sql
+    assert "alter column user_id set not null" in sql
+    assert "foreign key (document_id, user_id)" in sql
+    assert "references public.documents (id, owner_id)" in sql

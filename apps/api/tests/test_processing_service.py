@@ -102,6 +102,7 @@ def parsing_claim() -> ParsingClaim:
     return ParsingClaim(
         document=Document(
             id=document_id,
+            owner_id=uuid4(),
             filename="report.pdf",
             mime_type="application/pdf",
             storage_path="originals/report.pdf",

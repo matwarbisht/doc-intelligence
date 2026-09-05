@@ -1,19 +1,12 @@
-import {
-  createDocumentApiClient,
-  DEFAULT_API_BASE_URL,
-  type DocumentStatus,
-} from '@doc-intelligence/api-client';
+import { type DocumentStatus } from '@doc-intelligence/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 
+import { api } from '../../api/client';
 import { Card } from '../../components/Card/Card';
 import { Button } from '../../components/Button/Button';
 import styles from './DocumentDetailPage.module.scss';
-
-const api = createDocumentApiClient(
-  import.meta.env.VITE_API_URL ?? DEFAULT_API_BASE_URL,
-);
 
 export function DocumentDetailPage() {
   const { documentId = '' } = useParams();

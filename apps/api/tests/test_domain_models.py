@@ -14,6 +14,7 @@ from app.domain import (
 
 def test_new_document_has_safe_defaults() -> None:
     document = NewDocument(
+        owner_id=uuid4(),
         filename="report.pdf",
         mime_type="application/pdf",
         storage_path="documents/report.pdf",

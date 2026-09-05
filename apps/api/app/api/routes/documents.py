@@ -16,8 +16,9 @@ from fastapi import (
     status,
 )
 
-from app.api.dependencies import get_document_service, get_processing_service
+from app.api.dependencies import get_current_user, get_document_service, get_processing_service
 from app.core.config import get_settings
+from app.domain import AuthenticatedUser
 from app.providers import ObjectStorageError
 from app.schemas.documents import (
     DocumentDetailResponse,
@@ -41,6 +42,7 @@ ProcessingServiceDependency = Annotated[
     DocumentProcessor,
     Depends(get_processing_service),
 ]
+CurrentUserDependency = Annotated[AuthenticatedUser, Depends(get_current_user)]
 
 
 @router.post("", response_model=DocumentUploadResponse, status_code=status.HTTP_201_CREATED)
@@ -50,6 +52,7 @@ async def upload_document(
     request: Request,
     background_tasks: BackgroundTasks,
     service: DocumentServiceDependency,
+    current_user: CurrentUserDependency,
 ) -> DocumentUploadResponse:
     settings = get_settings()
     content = await file.read(settings.max_upload_bytes + 1)
@@ -57,6 +60,7 @@ async def upload_document(
 
     try:
         result = await service.upload(
+            owner_id=current_user.id,
             filename=file.filename or "",
             content_type=file.content_type,
             content=content,
@@ -108,7 +112,15 @@ async def process_document(
     document_id: UUID,
     background_tasks: BackgroundTasks,
     service: ProcessingServiceDependency,
+    document_service: DocumentServiceDependency,
+    current_user: CurrentUserDependency,
 ) -> DocumentProcessResponse:
+    document = await document_service.get_document(current_user.id, document_id)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found.",
+        )
     background_tasks.add_task(service.process_document, document_id)
     return DocumentProcessResponse(document_id=document_id)
 
@@ -116,10 +128,11 @@ async def process_document(
 @router.get("", response_model=DocumentListResponse)
 async def list_documents(
     service: DocumentServiceDependency,
+    current_user: CurrentUserDependency,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> DocumentListResponse:
-    documents = await service.list_documents(limit=limit, offset=offset)
+    documents = await service.list_documents(current_user.id, limit=limit, offset=offset)
     return DocumentListResponse(
         items=[DocumentResponse.from_domain(document) for document in documents],
         limit=limit,
@@ -131,8 +144,9 @@ async def list_documents(
 async def get_document(
     document_id: UUID,
     service: DocumentServiceDependency,
+    current_user: CurrentUserDependency,
 ) -> DocumentDetailResponse:
-    intelligence = await service.get_document_intelligence(document_id)
+    intelligence = await service.get_document_intelligence(current_user.id, document_id)
     if intelligence is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
