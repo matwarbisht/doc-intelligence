@@ -7,6 +7,8 @@ PROCESSING = MIGRATIONS / "20260904010000_processing_pipeline_constraints.sql"
 SEMANTIC_INDEXES = MIGRATIONS / "20260904020000_semantic_indexes.sql"
 AUTHENTICATION = MIGRATIONS / "20260905020000_add_authentication_and_ownership.sql"
 OWNERSHIP_CONTRACT = MIGRATIONS / "20260905020100_enforce_document_ownership.sql"
+ABUSE_PREVENTION = MIGRATIONS / "20260905030000_add_abuse_prevention_counters.sql"
+PROVIDER_USAGE = MIGRATIONS / "20260905030100_add_provider_usage_outcomes.sql"
 SEED = MIGRATIONS.parent / "seed.sql"
 
 
@@ -91,3 +93,22 @@ def test_ownership_contract_refuses_orphans_and_enforces_scoped_query_ownership(
     assert "alter column user_id set not null" in sql
     assert "foreign key (document_id, user_id)" in sql
     assert "references public.documents (id, owner_id)" in sql
+
+
+def test_abuse_prevention_schema_is_private_and_deduplicates_alerts() -> None:
+    sql = ABUSE_PREVENTION.read_text()
+
+    for table in ("quota_counters", "quota_alerts", "usage_events"):
+        assert f"create table public.{table}" in sql
+        assert f"alter table public.{table} enable row level security" in sql
+    assert "primary key (subject_type, subject_key, metric, window_start" in sql
+    assert "threshold in (70, 90, 100)" in sql
+    assert "subject_key never contains a raw IP address" in sql
+
+
+def test_provider_usage_outcomes_remain_sanitized_enumerated_values() -> None:
+    sql = PROVIDER_USAGE.read_text()
+
+    assert "usage_events_outcome_check" in sql
+    assert "'succeeded'" in sql
+    assert "'failed'" in sql

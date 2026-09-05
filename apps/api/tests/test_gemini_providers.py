@@ -1,7 +1,7 @@
 import json
 
 # pyright: reportUnknownMemberType=false
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -13,6 +13,28 @@ from app.providers import (
     GeminiEmbeddingProvider,
     GeminiSemanticExtractor,
 )
+
+
+class RecordingUsageGuard:
+    def __init__(self) -> None:
+        self.before: list[tuple[UUID, str, str]] = []
+        self.after: list[tuple[UUID, str, str, int | None, bool]] = []
+
+    async def before_provider_attempt(
+        self, *, user_id: UUID, provider: str, operation: str
+    ) -> None:
+        self.before.append((user_id, provider, operation))
+
+    async def after_provider_attempt(
+        self,
+        *,
+        user_id: UUID,
+        provider: str,
+        operation: str,
+        status_code: int | None,
+        succeeded: bool,
+    ) -> None:
+        self.after.append((user_id, provider, operation, status_code, succeeded))
 
 
 @pytest.mark.asyncio
@@ -137,7 +159,9 @@ async def test_gemini_answer_generator_validates_cited_evidence() -> None:
 @pytest.mark.asyncio
 async def test_gemini_answer_generator_retries_transient_failures() -> None:
     chunk_id = uuid4()
+    user_id = uuid4()
     calls = 0
+    usage = RecordingUsageGuard()
 
     async def handler(request: httpx.Request) -> httpx.Response:
         nonlocal calls
@@ -168,11 +192,20 @@ async def test_gemini_answer_generator_retries_transient_failures() -> None:
             model_name="answer-test",
             max_attempts=2,
             retry_base_seconds=0,
+            usage_guard=usage,
         )
-        result = await generator.generate("How much?", (evidence,))
+        result = await generator.generate("How much?", (evidence,), user_id=user_id)
 
     assert calls == 2
     assert result.answer == "Revenue grew by 24% [1]."
+    assert usage.before == [
+        (user_id, "gemini", "answer_generation"),
+        (user_id, "gemini", "answer_generation"),
+    ]
+    assert usage.after == [
+        (user_id, "gemini", "answer_generation", 503, False),
+        (user_id, "gemini", "answer_generation", 200, True),
+    ]
 
 
 @pytest.mark.asyncio

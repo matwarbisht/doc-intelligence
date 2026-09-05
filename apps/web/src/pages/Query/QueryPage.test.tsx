@@ -151,3 +151,44 @@ it('uses the document from the URL as a strict query scope', async () => {
     screen.getByText('Answers may use evidence from every ready document.'),
   ).toBeVisible();
 });
+
+it('keeps document review available when asking is disabled', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockImplementation((url: string) =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify(
+            url.endsWith('/capabilities')
+              ? {
+                  public_signup: true,
+                  uploads: true,
+                  processing: true,
+                  processing_retries: true,
+                  ask: false,
+                }
+              : { items: [], limit: 50, offset: 0 },
+          ),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    ),
+  );
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+
+  render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <QueryPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+
+  expect(
+    await screen.findByText(/question answering is temporarily unavailable/i),
+  ).toBeVisible();
+  expect(screen.getByLabelText('Question')).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Ask documents' })).toBeDisabled();
+});

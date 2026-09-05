@@ -11,9 +11,17 @@ from app.repositories.postgres_enrichment_repository import PostgresEnrichmentRe
 from app.repositories.postgres_processing_repository import PostgresProcessingRepository
 from app.repositories.postgres_profile_repository import PostgresProfileRepository
 from app.repositories.postgres_query_repository import PostgresQueryRepository
+from app.repositories.postgres_safeguard_repository import PostgresSafeguardRepository
 from app.repositories.processing_repository import ParsingClaim, ProcessingRepository
 from app.repositories.profile_repository import ProfileRepository
 from app.repositories.query_repository import QueryRepository
+from app.repositories.safeguard_repository import (
+    QuotaLimit,
+    QuotaRejectedError,
+    QuotaReservation,
+    QuotaUsage,
+    SafeguardRepository,
+)
 
 __all__ = [
     "DocumentRepository",
@@ -27,7 +35,13 @@ __all__ = [
     "PostgresProcessingRepository",
     "PostgresProfileRepository",
     "PostgresQueryRepository",
+    "PostgresSafeguardRepository",
     "ProcessingRepository",
     "ProfileRepository",
     "QueryRepository",
+    "QuotaLimit",
+    "QuotaRejectedError",
+    "QuotaReservation",
+    "QuotaUsage",
+    "SafeguardRepository",
 ]

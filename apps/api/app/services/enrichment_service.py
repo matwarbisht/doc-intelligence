@@ -71,7 +71,10 @@ class DocumentEnrichmentService:
                 for chunk in embedding_claim.chunks
             )
             try:
-                vectors = await self._embeddings.embed(chunks)
+                vectors = await self._embeddings.embed(
+                    chunks,
+                    user_id=embedding_claim.document.owner_id,
+                )
                 document = await self._repository.complete_embedding(
                     embedding_claim,
                     provider=self._embeddings.provider_name,
@@ -104,7 +107,10 @@ class DocumentEnrichmentService:
             chunks = tuple(
                 ExtractionChunk(id=chunk.id, content=chunk.content) for chunk in claim.chunks
             )
-            extraction = await self._extractor.extract(chunks)
+            extraction = await self._extractor.extract(
+                chunks,
+                user_id=claim.document.owner_id,
+            )
             return await self._repository.complete_extraction(claim, extraction)
         except Exception as error:
             return await self._repository.fail_extraction(

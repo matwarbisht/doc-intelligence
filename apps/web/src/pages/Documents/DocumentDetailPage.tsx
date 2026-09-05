@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 
 import { api } from '../../api/client';
+import { useCapabilities } from '../../api/useCapabilities';
 import { Card } from '../../components/Card/Card';
 import { Button } from '../../components/Button/Button';
 import styles from './DocumentDetailPage.module.scss';
@@ -11,6 +12,11 @@ import styles from './DocumentDetailPage.module.scss';
 export function DocumentDetailPage() {
   const { documentId = '' } = useParams();
   const queryClient = useQueryClient();
+  const capabilities = useCapabilities();
+  const retryEnabled =
+    capabilities.data?.processing !== false &&
+    capabilities.data?.processing_retries !== false;
+  const askEnabled = capabilities.data?.ask !== false;
   const [retryAttemptBaseline, setRetryAttemptBaseline] = useState<
     number | null
   >(null);
@@ -75,7 +81,7 @@ export function DocumentDetailPage() {
           <span className={styles.status} data-status={detail.status}>
             {detail.status.replaceAll('_', ' ')}
           </span>
-          {detail.status === 'ready' ? (
+          {detail.status === 'ready' && askEnabled ? (
             <Link
               className={styles.askLink}
               to={`/ask?document=${encodeURIComponent(detail.id)}`}
@@ -87,11 +93,17 @@ export function DocumentDetailPage() {
             <Button
               variant="secondary"
               onClick={() => retry.mutate()}
-              disabled={retry.isPending || retryAttemptBaseline !== null}
+              disabled={
+                retry.isPending ||
+                retryAttemptBaseline !== null ||
+                !retryEnabled
+              }
             >
-              {retry.isPending || retryAttemptBaseline !== null
-                ? 'Retry queued…'
-                : 'Retry processing'}
+              {!retryEnabled
+                ? 'Retries unavailable'
+                : retry.isPending || retryAttemptBaseline !== null
+                  ? 'Retry queued…'
+                  : 'Retry processing'}
             </Button>
           ) : null}
         </div>

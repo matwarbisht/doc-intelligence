@@ -6,6 +6,7 @@ import logging
 import math
 from collections.abc import Mapping
 from typing import cast
+from uuid import UUID
 
 import httpx
 from pydantic import ValidationError
@@ -19,6 +20,7 @@ from app.domain import (
 )
 from app.providers.answer_generator import AnswerGeneratorError
 from app.providers.embedding_provider import EmbeddingProviderError
+from app.providers.provider_usage import ProviderUsageGuard
 from app.providers.semantic_extractor import SemanticExtractionError
 
 GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
@@ -42,8 +44,18 @@ async def _post_with_retry(
     operation: str,
     max_attempts: int,
     retry_base_seconds: float,
+    usage_guard: ProviderUsageGuard | None,
+    user_id: UUID | None,
 ) -> httpx.Response:
     for attempt in range(1, max_attempts + 1):
+        if usage_guard is not None:
+            if user_id is None:
+                raise RuntimeError("A user is required for metered provider work.")
+            await usage_guard.before_provider_attempt(
+                user_id=user_id,
+                provider="gemini",
+                operation=operation,
+            )
         try:
             response = await client.post(
                 url,
@@ -52,8 +64,27 @@ async def _post_with_retry(
                 timeout=timeout_seconds,
             )
             response.raise_for_status()
+            if usage_guard is not None and user_id is not None:
+                await usage_guard.after_provider_attempt(
+                    user_id=user_id,
+                    provider="gemini",
+                    operation=operation,
+                    status_code=response.status_code,
+                    succeeded=True,
+                )
             return response
         except httpx.HTTPError as error:
+            status = (
+                error.response.status_code if isinstance(error, httpx.HTTPStatusError) else None
+            )
+            if usage_guard is not None and user_id is not None:
+                await usage_guard.after_provider_attempt(
+                    user_id=user_id,
+                    provider="gemini",
+                    operation=operation,
+                    status_code=status,
+                    succeeded=False,
+                )
             if attempt == max_attempts or not _is_transient(error):
                 raise
             logger.warning(
@@ -63,11 +94,7 @@ async def _post_with_retry(
                     "provider": "gemini",
                     "operation": operation,
                     "attempt": attempt,
-                    "status_code": (
-                        error.response.status_code
-                        if isinstance(error, httpx.HTTPStatusError)
-                        else None
-                    ),
+                    "status_code": status,
                 },
             )
             await asyncio.sleep(retry_base_seconds * (2 ** (attempt - 1)))
@@ -95,6 +122,7 @@ class GeminiSemanticExtractor:
         timeout_seconds: float = 120,
         max_attempts: int = 3,
         retry_base_seconds: float = 0.5,
+        usage_guard: ProviderUsageGuard | None = None,
     ) -> None:
         self._client = client
         self._api_key = api_key
@@ -102,8 +130,14 @@ class GeminiSemanticExtractor:
         self._timeout_seconds = timeout_seconds
         self._max_attempts = max_attempts
         self._retry_base_seconds = retry_base_seconds
+        self._usage_guard = usage_guard
 
-    async def extract(self, chunks: tuple[ExtractionChunk, ...]) -> SemanticExtraction:
+    async def extract(
+        self,
+        chunks: tuple[ExtractionChunk, ...],
+        *,
+        user_id: UUID | None = None,
+    ) -> SemanticExtraction:
         payload = {
             "contents": [
                 {
@@ -127,6 +161,8 @@ class GeminiSemanticExtractor:
                 operation="extraction",
                 max_attempts=self._max_attempts,
                 retry_base_seconds=self._retry_base_seconds,
+                usage_guard=self._usage_guard,
+                user_id=user_id,
             )
         except httpx.HTTPError as error:
             raise SemanticExtractionError(_gemini_http_error("extraction", error)) from error
@@ -170,6 +206,7 @@ class GeminiEmbeddingProvider:
         concurrency: int = 5,
         max_attempts: int = 3,
         retry_base_seconds: float = 0.5,
+        usage_guard: ProviderUsageGuard | None = None,
     ) -> None:
         self._client = client
         self._api_key = api_key
@@ -179,18 +216,48 @@ class GeminiEmbeddingProvider:
         self._semaphore = asyncio.Semaphore(concurrency)
         self._max_attempts = max_attempts
         self._retry_base_seconds = retry_base_seconds
+        self._usage_guard = usage_guard
 
-    async def embed(self, chunks: tuple[ExtractionChunk, ...]) -> tuple[ChunkVector, ...]:
-        return tuple(await asyncio.gather(*(self._embed_one(chunk) for chunk in chunks)))
+    async def embed(
+        self,
+        chunks: tuple[ExtractionChunk, ...],
+        *,
+        user_id: UUID | None = None,
+    ) -> tuple[ChunkVector, ...]:
+        return tuple(
+            await asyncio.gather(*(self._embed_one(chunk, user_id=user_id) for chunk in chunks))
+        )
 
-    async def embed_query(self, query: str) -> tuple[float, ...]:
-        return await self._embed_text(query, task_type="RETRIEVAL_QUERY")
+    async def embed_query(
+        self,
+        query: str,
+        *,
+        user_id: UUID | None = None,
+    ) -> tuple[float, ...]:
+        return await self._embed_text(
+            query,
+            task_type="RETRIEVAL_QUERY",
+            operation="query_embedding",
+            user_id=user_id,
+        )
 
-    async def _embed_one(self, chunk: ExtractionChunk) -> ChunkVector:
-        values = await self._embed_text(chunk.content, task_type="RETRIEVAL_DOCUMENT")
+    async def _embed_one(self, chunk: ExtractionChunk, *, user_id: UUID | None) -> ChunkVector:
+        values = await self._embed_text(
+            chunk.content,
+            task_type="RETRIEVAL_DOCUMENT",
+            operation="document_embedding",
+            user_id=user_id,
+        )
         return ChunkVector(chunk_id=chunk.id, values=values)
 
-    async def _embed_text(self, text: str, *, task_type: str) -> tuple[float, ...]:
+    async def _embed_text(
+        self,
+        text: str,
+        *,
+        task_type: str,
+        operation: str,
+        user_id: UUID | None,
+    ) -> tuple[float, ...]:
         async with self._semaphore:
             try:
                 response = await _post_with_retry(
@@ -203,9 +270,11 @@ class GeminiEmbeddingProvider:
                         "outputDimensionality": self.dimension,
                     },
                     timeout_seconds=self._timeout_seconds,
-                    operation="embedding",
+                    operation=operation,
                     max_attempts=self._max_attempts,
                     retry_base_seconds=self._retry_base_seconds,
+                    usage_guard=self._usage_guard,
+                    user_id=user_id,
                 )
             except httpx.HTTPError as error:
                 raise EmbeddingProviderError(_gemini_http_error("embedding", error)) from error
@@ -241,6 +310,7 @@ class GeminiAnswerGenerator:
         timeout_seconds: float = 120,
         max_attempts: int = 3,
         retry_base_seconds: float = 0.5,
+        usage_guard: ProviderUsageGuard | None = None,
     ) -> None:
         self._client = client
         self._api_key = api_key
@@ -248,11 +318,14 @@ class GeminiAnswerGenerator:
         self._timeout_seconds = timeout_seconds
         self._max_attempts = max_attempts
         self._retry_base_seconds = retry_base_seconds
+        self._usage_guard = usage_guard
 
     async def generate(
         self,
         question: str,
         evidence: tuple[RetrievalHit, ...],
+        *,
+        user_id: UUID | None = None,
     ) -> GeneratedAnswer:
         payload = {
             "systemInstruction": {
@@ -289,6 +362,8 @@ class GeminiAnswerGenerator:
                 operation="answer_generation",
                 max_attempts=self._max_attempts,
                 retry_base_seconds=self._retry_base_seconds,
+                usage_guard=self._usage_guard,
+                user_id=user_id,
             )
         except httpx.HTTPError as error:
             raise AnswerGeneratorError(_gemini_http_error("answer generation", error)) from error

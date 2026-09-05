@@ -21,10 +21,18 @@ from app.services.processing_service import (
     ProcessingResult,
 )
 from app.services.query_service import CorpusQueryService, EmptyQueryError, QueryServiceError
+from app.services.safeguard_service import (
+    Capabilities,
+    LogAlertSink,
+    SafeguardLimits,
+    SafeguardService,
+    SafeguardViolation,
+)
 
 __all__ = [
     "AuthenticationService",
     "CorpusQueryService",
+    "Capabilities",
     "BoundedDocumentProcessor",
     "DocumentService",
     "DocumentProcessingService",
@@ -40,6 +48,10 @@ __all__ = [
     "ProcessingError",
     "ProcessingResult",
     "QueryServiceError",
+    "LogAlertSink",
+    "SafeguardLimits",
+    "SafeguardService",
+    "SafeguardViolation",
     "SuspendedAccountError",
     "UnsupportedDocumentTypeError",
 ]

@@ -125,17 +125,37 @@ export interface CorpusQueryResponse {
   created_at: string;
 }
 
+export interface CapabilitiesResponse {
+  public_signup: boolean;
+  uploads: boolean;
+  processing: boolean;
+  processing_retries: boolean;
+  ask: boolean;
+}
+
 export class ApiError extends Error {
   readonly status: number;
+  readonly code: string | null;
+  readonly retryAfterSeconds: number | null;
 
-  constructor(message: string, status: number) {
+  constructor(
+    message: string,
+    status: number,
+    code: string | null = null,
+    retryAfterSeconds: number | null = null,
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.code = code;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
 export interface DocumentApiClient {
+  getCapabilities(options?: {
+    signal?: AbortSignal;
+  }): Promise<CapabilitiesResponse>;
   queryCorpus(
     query: string,
     options?: { documentId?: string; signal?: AbortSignal },
@@ -193,6 +213,11 @@ export function createDocumentApiClient(
   };
 
   return {
+    getCapabilities: ({ signal } = {}) =>
+      request<CapabilitiesResponse>(`${apiUrl}/api/v1/capabilities`, {
+        signal,
+      }),
+
     queryCorpus: (query, { documentId, signal } = {}) =>
       authenticatedRequest<CorpusQueryResponse>(`${apiUrl}/api/v1/query`, {
         method: 'POST',
@@ -239,25 +264,43 @@ export function createDocumentApiClient(
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (!response.ok) {
-    throw new ApiError(await errorMessage(response), response.status);
+    const error = await errorDetails(response);
+    throw new ApiError(
+      error.message,
+      response.status,
+      error.code,
+      error.retryAfterSeconds,
+    );
   }
   return (await response.json()) as T;
 }
 
-async function errorMessage(response: Response): Promise<string> {
+async function errorDetails(response: Response): Promise<{
+  message: string;
+  code: string | null;
+  retryAfterSeconds: number | null;
+}> {
   const fallback = `Request failed with status ${response.status}.`;
   try {
     const payload = (await response.json()) as unknown;
-    if (
-      typeof payload === 'object' &&
-      payload !== null &&
-      'detail' in payload &&
-      typeof payload.detail === 'string'
-    ) {
-      return payload.detail;
+    if (typeof payload === 'object' && payload !== null) {
+      const message =
+        'detail' in payload && typeof payload.detail === 'string'
+          ? payload.detail
+          : fallback;
+      const code =
+        'code' in payload && typeof payload.code === 'string'
+          ? payload.code
+          : null;
+      const retryAfterSeconds =
+        'retry_after_seconds' in payload &&
+        typeof payload.retry_after_seconds === 'number'
+          ? payload.retry_after_seconds
+          : null;
+      return { message, code, retryAfterSeconds };
     }
   } catch {
-    return fallback;
+    return { message: fallback, code: null, retryAfterSeconds: null };
   }
-  return fallback;
+  return { message: fallback, code: null, retryAfterSeconds: null };
 }

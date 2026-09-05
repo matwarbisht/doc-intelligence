@@ -7,11 +7,16 @@ from uuid import UUID
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.api.dependencies import get_current_user, get_document_service
+from app.api.dependencies import get_current_user, get_document_service, get_safeguard_service
+from app.api.errors import safeguard_violation_handler
 from app.api.routes.documents import router
 from app.domain import AuthenticatedUser
-from app.services import DocumentService
-from tests.fakes import InMemoryDocumentRepository, InMemoryObjectStorage
+from app.services import Capabilities, DocumentService, SafeguardViolation
+from tests.fakes import (
+    InMemoryDocumentRepository,
+    InMemoryObjectStorage,
+    unrestricted_safeguards,
+)
 
 TEST_USER = AuthenticatedUser(
     id=UUID("10000000-0000-4000-8000-000000000001"), email="alice@example.test"
@@ -26,6 +31,7 @@ def create_test_client(service: DocumentService) -> tuple[FastAPI, TestClient]:
     application.include_router(router, prefix="/api/v1")
     application.dependency_overrides[get_document_service] = lambda: service
     application.dependency_overrides[get_current_user] = lambda: TEST_USER
+    application.dependency_overrides[get_safeguard_service] = unrestricted_safeguards
     return application, TestClient(application)
 
 
@@ -117,6 +123,28 @@ def test_rejects_unsupported_upload() -> None:
     assert response.json()["detail"].startswith("Unsupported document type")
 
 
+def test_disabled_upload_is_rejected_before_storage() -> None:
+    storage = InMemoryObjectStorage()
+    safeguards = unrestricted_safeguards()
+    safeguards.capabilities = Capabilities(True, False, True, True, True)
+    application, client = create_test_client(DocumentService(InMemoryDocumentRepository(), storage))
+    application.add_exception_handler(SafeguardViolation, safeguard_violation_handler)
+    application.dependency_overrides[get_safeguard_service] = lambda: safeguards
+
+    try:
+        response = client.post(
+            "/api/v1/documents",
+            files={"file": ("notes.txt", b"must not persist", "text/plain")},
+        )
+    finally:
+        client.close()
+        application.dependency_overrides.clear()
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "uploads_disabled"
+    assert storage.objects == {}
+
+
 def test_process_endpoint_requires_a_configured_parser() -> None:
     service = DocumentService(InMemoryDocumentRepository(), InMemoryObjectStorage())
     application, client = create_test_client(service)
@@ -157,6 +185,7 @@ def test_users_cannot_see_or_deduplicate_each_others_documents() -> None:
     application.dependency_overrides[get_document_service] = lambda: service
     current_user = {"value": TEST_USER}
     application.dependency_overrides[get_current_user] = lambda: current_user["value"]
+    application.dependency_overrides[get_safeguard_service] = unrestricted_safeguards
     client = TestClient(application)
 
     try:

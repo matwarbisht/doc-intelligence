@@ -4,6 +4,7 @@ import { type FormEvent, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 
 import { api as client } from '../../api/client';
+import { useCapabilities } from '../../api/useCapabilities';
 import { Button } from '../../components/Button/Button';
 import { Card } from '../../components/Card/Card';
 import { Input } from '../../components/Input/Input';
@@ -13,6 +14,8 @@ export function QueryPage() {
   const [question, setQuestion] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedDocumentId = searchParams.get('document') ?? '';
+  const capabilities = useCapabilities();
+  const askEnabled = capabilities.data?.ask !== false;
   const documents = useQuery({
     queryKey: ['documents', 'query-scope'],
     queryFn: ({ signal }) => client.listDocuments({ signal }),
@@ -42,7 +45,7 @@ export function QueryPage() {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalized = question.trim();
-    if (normalized) {
+    if (normalized && askEnabled) {
       queryMutation.mutate({
         value: normalized,
         documentId: selectedDocumentId,
@@ -122,16 +125,24 @@ export function QueryPage() {
                   : 'What do these documents say about…?'
               }
               maxLength={2000}
-              disabled={queryMutation.isPending}
+              disabled={queryMutation.isPending || !askEnabled}
             />
             <Button
               type="submit"
-              disabled={!question.trim() || queryMutation.isPending}
+              disabled={
+                !question.trim() || queryMutation.isPending || !askEnabled
+              }
             >
               {queryMutation.isPending ? 'Finding evidence…' : 'Ask documents'}
             </Button>
           </div>
         </form>
+        {!askEnabled ? (
+          <p className={styles.notice} role="status">
+            Question answering is temporarily unavailable. You can still review
+            your existing documents.
+          </p>
+        ) : null}
         {errorMessage ? (
           <p className={styles.error} role="alert">
             {errorMessage}

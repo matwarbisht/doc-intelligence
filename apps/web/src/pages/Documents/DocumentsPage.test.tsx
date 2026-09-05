@@ -35,13 +35,25 @@ function renderPage() {
 it('lists documents from the API', async () => {
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({ items: [document], limit: 50, offset: 0 }),
-        {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        },
+    vi.fn().mockImplementation((url: string) =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify(
+            url.endsWith('/capabilities')
+              ? {
+                  public_signup: true,
+                  uploads: true,
+                  processing: true,
+                  processing_retries: true,
+                  ask: true,
+                }
+              : { items: [document], limit: 50, offset: 0 },
+          ),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          },
+        ),
       ),
     ),
   );
@@ -63,6 +75,37 @@ it('shows browser-level errors when the document list cannot be loaded', async (
   renderPage();
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Failed to fetch');
+});
+
+it('disables upload controls when the server closes document intake', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockImplementation((url: string) =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify(
+            url.endsWith('/capabilities')
+              ? {
+                  public_signup: true,
+                  uploads: false,
+                  processing: true,
+                  processing_retries: true,
+                  ask: true,
+                }
+              : { items: [], limit: 50, offset: 0 },
+          ),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    ),
+  );
+
+  renderPage();
+
+  expect(
+    await screen.findByText(/uploads are temporarily unavailable/i),
+  ).toBeVisible();
+  expect(screen.getByLabelText('Choose files')).toBeDisabled();
 });
 
 it('queues and uploads multiple dropped documents independently', async () => {

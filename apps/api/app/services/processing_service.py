@@ -92,6 +92,7 @@ class DocumentProcessingService:
             filename=claim.document.filename,
             content_type=claim.document.mime_type,
             content=content,
+            user_id=claim.document.owner_id,
         )
         elements = canonicalize_document(
             parsed,

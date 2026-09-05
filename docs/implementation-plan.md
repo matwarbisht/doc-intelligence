@@ -120,10 +120,29 @@ The detailed design and rollout checklist live in the
 - Verify there are no orphaned documents, queries, or mismatched document-scoped queries.
 - Enforce non-null ownership only after the backfill has been run in each existing environment.
 
-### Phase 10C — Abuse controls and operations (planned)
+### Phase 10C — Demo-ready abuse controls (complete)
 
-- Add persisted feature switches for signup, uploads, processing, retries, and questions.
-- Add per-user and per-IP short-window rate limits plus daily upload, byte, retry, and query quotas.
-- Reserve provider work before scheduling it and keep retry/idempotency behavior quota-safe.
-- Add structured usage events, threshold alerts, operator commands, and incident runbooks.
-- Keep public signup available by default while preserving an authoritative emergency shutdown path.
+- Add server configuration switches for signup, uploads, processing, retries, and questions,
+  plus a public capability response for clear disabled-state UI.
+- Add atomic Postgres fixed-window counters for per-user/IP request limits, daily upload,
+  byte, retry, and ask quotas, retry cooldowns, global intake budgets, and stored-document caps.
+- Compensate upload acceptance reservations on invalid, duplicate, or failed uploads while
+  retaining request-rate accounting.
+- Return typed `429`/`503` errors and `Retry-After`, hash direct peer IPs with a server secret,
+  and retain only sanitized usage events.
+- Retain an optional, inactive threshold-event boundary for future alert delivery and provide
+  dry-run-first cleanup tooling plus the operator kill-switch runbook.
+- Keep public signup available by default while documenting the separate authoritative
+  Supabase registration shutdown.
+- Attribute background and query provider attempts to the owning user.
+- Reserve operation-specific Unstructured and Gemini budgets immediately before every actual
+  provider attempt, including adapter retries.
+- Record sanitized provider outcomes and open bounded per-operation circuits after clustered
+  `429` or retryable `5xx` responses.
+- Verify feature shutdown, hard budgets, adapter retry accounting, circuit behavior, and
+  cross-user isolation with deterministic tests that make no real provider calls.
+
+The following are deliberately deferred until production readiness: server/external alert
+delivery, provider-dashboard alerts, production TLS/CORS validation, quota-exhaustion
+rehearsal, and provider-key rotation rehearsal. They are not required for the current
+controlled demo, and no claim is made that unattended public operation is ready.

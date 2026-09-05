@@ -7,6 +7,38 @@ afterEach(() => {
 });
 
 describe('document API client', () => {
+  it('loads public capability switches without a bearer token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          public_signup: true,
+          uploads: false,
+          processing: true,
+          processing_retries: false,
+          ask: true,
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const tokenProvider = vi.fn().mockResolvedValue('access-token');
+
+    const response = await createDocumentApiClient(
+      'http://api.test',
+      tokenProvider,
+    ).getCapabilities();
+
+    expect(response.uploads).toBe(false);
+    expect(tokenProvider).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/capabilities',
+      { signal: undefined },
+    );
+  });
+
   it('lists documents from the versioned API', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ items: [], limit: 50, offset: 0 }), {
@@ -117,6 +149,34 @@ describe('document API client', () => {
     await expect(promise).rejects.toEqual(
       new ApiError('Unsupported document type.', 415),
     );
+  });
+
+  it('preserves typed quota codes and retry timing', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            detail: 'Daily question limit reached.',
+            code: 'daily_question_limit',
+            retry_after_seconds: 90,
+          }),
+          {
+            status: 429,
+            headers: { 'content-type': 'application/json' },
+          },
+        ),
+      ),
+    );
+
+    await expect(
+      createDocumentApiClient().queryCorpus('What changed?'),
+    ).rejects.toMatchObject({
+      status: 429,
+      code: 'daily_question_limit',
+      retryAfterSeconds: 90,
+      message: 'Daily question limit reached.',
+    });
   });
 
   it('requests parsing for a document', async () => {

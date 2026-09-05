@@ -65,10 +65,10 @@ class FakeQueryEmbeddings:
     model_version: str | None = None
     dimension = 3
 
-    async def embed(self, chunks):  # type: ignore[no-untyped-def]
+    async def embed(self, chunks, *, user_id=None):  # type: ignore[no-untyped-def]
         return ()
 
-    async def embed_query(self, query: str) -> tuple[float, ...]:
+    async def embed_query(self, query: str, *, user_id: UUID | None = None) -> tuple[float, ...]:
         return (1.0, 0.0, 0.0)
 
 
@@ -79,7 +79,13 @@ class FakeAnswerGenerator:
     prompt_version = "test"
     schema_version = "test"
 
-    async def generate(self, question: str, evidence: tuple[RetrievalHit, ...]):
+    async def generate(  # type: ignore[no-untyped-def]
+        self,
+        question: str,
+        evidence: tuple[RetrievalHit, ...],
+        *,
+        user_id: UUID | None = None,
+    ):
         return GeneratedAnswer(
             answer="The notes describe the change [2].",
             citations=(GeneratedCitation(source_number=2, chunk_id=evidence[1].chunk_id),),

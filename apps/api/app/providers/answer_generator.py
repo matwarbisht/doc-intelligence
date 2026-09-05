@@ -1,6 +1,7 @@
 """Application-owned boundary for grounded answer generation."""
 
 from typing import Protocol
+from uuid import UUID
 
 from app.domain import GeneratedAnswer, RetrievalHit
 
@@ -20,4 +21,6 @@ class AnswerGenerator(Protocol):
         self,
         question: str,
         evidence: tuple[RetrievalHit, ...],
+        *,
+        user_id: UUID | None = None,
     ) -> GeneratedAnswer: ...

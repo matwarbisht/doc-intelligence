@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router';
 
 import { useAuth } from '../../auth/useAuth';
+import { api } from '../../api/client';
 import { Button } from '../../components/Button/Button';
 import { Card } from '../../components/Card/Card';
 import { Input } from '../../components/Input/Input';
@@ -23,12 +24,31 @@ export function AuthPage({ mode }: AuthPageProps) {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [publicSignupEnabled, setPublicSignupEnabled] = useState<
+    boolean | null
+  >(null);
   const returnState = location.state as ReturnLocationState | null;
   const destination = `${returnState?.from?.pathname ?? '/documents'}${returnState?.from?.search ?? ''}`;
 
   useEffect(() => {
     if (user) navigate(destination, { replace: true });
   }, [destination, navigate, user]);
+
+  useEffect(() => {
+    if (mode !== 'sign-up') return;
+    let active = true;
+    void api
+      .getCapabilities()
+      .then((capabilities) => {
+        if (active) setPublicSignupEnabled(capabilities.public_signup);
+      })
+      .catch(() => {
+        if (active) setPublicSignupEnabled(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [mode]);
 
   if (!loading && user) return <Navigate to={destination} replace />;
 
@@ -49,6 +69,7 @@ export function AuthPage({ mode }: AuthPageProps) {
   }
 
   const signingUp = mode === 'sign-up';
+  const signupUnavailable = signingUp && publicSignupEnabled === false;
   return (
     <section className={styles.page}>
       <div className={styles.introduction}>
@@ -85,6 +106,11 @@ export function AuthPage({ mode }: AuthPageProps) {
               {configurationError}
             </p>
           ) : null}
+          {signupUnavailable ? (
+            <p className={styles.error} role="alert">
+              New account registration is temporarily unavailable.
+            </p>
+          ) : null}
           {error ? (
             <p className={styles.error} role="alert">
               {error}
@@ -92,7 +118,11 @@ export function AuthPage({ mode }: AuthPageProps) {
           ) : null}
           <Button
             type="submit"
-            disabled={submitting || Boolean(configurationError)}
+            disabled={
+              submitting ||
+              Boolean(configurationError) ||
+              (signingUp && publicSignupEnabled !== true)
+            }
           >
             {submitting
               ? signingUp

@@ -33,7 +33,7 @@ class FakeExtractor:
     def __init__(self) -> None:
         self.calls = 0
 
-    async def extract(self, chunks):  # type: ignore[no-untyped-def]
+    async def extract(self, chunks, *, user_id=None):  # type: ignore[no-untyped-def]
         self.calls += 1
         return SemanticExtraction(
             document_type="report",
@@ -57,10 +57,10 @@ class FakeEmbeddings:
     model_version: str | None = None
     dimension = 3
 
-    async def embed(self, chunks):  # type: ignore[no-untyped-def]
+    async def embed(self, chunks, *, user_id=None):  # type: ignore[no-untyped-def]
         return tuple(ChunkVector(chunk_id=chunk.id, values=(1.0, 0.0, 0.0)) for chunk in chunks)
 
-    async def embed_query(self, query: str) -> tuple[float, ...]:
+    async def embed_query(self, query: str, *, user_id: UUID | None = None) -> tuple[float, ...]:
         return (1.0, 0.0, 0.0)
 
 

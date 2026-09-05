@@ -1,10 +1,33 @@
 import asyncio
 import json
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
 
 from app.providers import DocumentParserError, UnstructuredDocumentParser
+
+
+class RecordingUsageGuard:
+    def __init__(self) -> None:
+        self.before: list[tuple[UUID, str, str]] = []
+        self.after: list[tuple[UUID, str, str, int | None, bool]] = []
+
+    async def before_provider_attempt(
+        self, *, user_id: UUID, provider: str, operation: str
+    ) -> None:
+        self.before.append((user_id, provider, operation))
+
+    async def after_provider_attempt(
+        self,
+        *,
+        user_id: UUID,
+        provider: str,
+        operation: str,
+        status_code: int | None,
+        succeeded: bool,
+    ) -> None:
+        self.after.append((user_id, provider, operation, status_code, succeeded))
 
 
 @pytest.mark.asyncio
@@ -128,6 +151,8 @@ async def test_unstructured_parser_hides_provider_response_details() -> None:
 @pytest.mark.asyncio
 async def test_unstructured_parser_retries_transient_throttling() -> None:
     create_attempts = 0
+    user_id = uuid4()
+    usage = RecordingUsageGuard()
 
     async def handler(request: httpx.Request) -> httpx.Response:
         nonlocal create_attempts
@@ -160,15 +185,25 @@ async def test_unstructured_parser_retries_transient_throttling() -> None:
             api_url="https://parser.example.test/api/v1",
             api_key="test-key",
             retry_base_seconds=0,
+            usage_guard=usage,
         )
         parsed = await parser.parse(
             filename="report.pdf",
             content_type="application/pdf",
             content=b"pdf",
+            user_id=user_id,
         )
 
     assert create_attempts == 2
     assert parsed.elements[0].text == "Recovered"
+    assert usage.before == [
+        (user_id, "unstructured", "job_submission"),
+        (user_id, "unstructured", "job_submission"),
+    ]
+    assert usage.after == [
+        (user_id, "unstructured", "job_submission", 429, False),
+        (user_id, "unstructured", "job_submission", 200, True),
+    ]
 
 
 @pytest.mark.asyncio

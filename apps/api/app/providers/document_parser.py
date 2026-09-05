@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from typing import Protocol
+from uuid import UUID
 
 from app.domain import Metadata, StructuredContent
 
@@ -36,4 +37,5 @@ class DocumentParser(Protocol):
         filename: str,
         content_type: str,
         content: bytes,
+        user_id: UUID | None = None,
     ) -> ParsedDocument: ...

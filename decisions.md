@@ -4,6 +4,75 @@ This is a running record of consequential product and engineering calls made whi
 
 New decisions should be appended when a choice meaningfully affects architecture, product scope, operations, cost, security, or future implementation. If a decision changes, keep the original entry and add a superseding one so the history remains honest.
 
+## Decision ownership
+
+Ownership here means who made or explicitly selected the call, not necessarily who first
+suggested or wrote it. A project-owner decision includes choices specified before development
+or selected after discussing alternatives with the AI. An AI-agent decision is an
+implementation call the agent made autonomously within an approved goal. Every decision still
+belongs to the project and can be corrected or superseded by the project owner.
+
+When adding a new detailed record, also add it to exactly one of the two indexes below. Merely
+approving a phase does not transfer every low-level implementation choice into the
+project-owner section.
+
+### Section 1 — Project-owner decisions
+
+| ID   | Decision                                                               |
+| ---- | ---------------------------------------------------------------------- |
+| D001 | Ship Stage 1 as one complete vertical slice                            |
+| D002 | Use a small monorepo                                                   |
+| D003 | Use React, TypeScript, and Vite instead of Next.js                     |
+| D004 | Use FastAPI and Python for the backend                                 |
+| D005 | Keep application-owned boundaries around infrastructure                |
+| D007 | Build a lightweight token-based design system first                    |
+| D008 | Use Supabase Postgres as the system of record                          |
+| D011 | Preserve originals and create an application-owned canonical model     |
+| D014 | Model processing as durable, retryable stages                          |
+| D015 | Use Unstructured behind a parser adapter                               |
+| D016 | Chunk by document structure, not blind fixed windows                   |
+| D017 | Extract generic semantic records with evidence                         |
+| D030 | Model document-level questions as an optional retrieval scope          |
+| D032 | Orchestrate bulk ingestion over the single-document API                |
+| D035 | Use Supabase Auth for public email/password accounts                   |
+| D036 | Make ownership explicit at document and query boundaries               |
+| D039 | Enforce initial abuse limits with atomic Postgres admission counters   |
+| D040 | Use restart-based kill switches and sanitized log alerts first         |
+| D041 | Meter every provider attempt and verify demo safety without live quota |
+| D042 | Expose generated API documentation only in development                 |
+| D043 | Build persistent multi-representation intelligence, not document chat  |
+| D044 | Preserve table structure alongside retrieval text                      |
+| D045 | Use TanStack Query as the frontend server-state boundary               |
+
+### Section 2 — AI-agent decisions
+
+| ID   | Decision                                                                  |
+| ---- | ------------------------------------------------------------------------- |
+| D006 | Maintain a dedicated typed API-client package                             |
+| D009 | Use versioned SQL migrations and direct asyncpg persistence               |
+| D010 | Make local infrastructure reproducible and disposable                     |
+| D012 | Limit the first upload surface and deduplicate by content                 |
+| D013 | Keep documents private and route browser access through FastAPI           |
+| D018 | Use Gemini embeddings in Postgres with an explicit index contract         |
+| D019 | Pin a supported Gemini extraction model                                   |
+| D020 | Sanitize provider failures but persist actionable stage errors            |
+| D021 | Use CI as a quality gate, not a deployment pipeline                       |
+| D022 | Use deterministic hybrid retrieval before adding an LLM planner           |
+| D023 | Generate answers only from bounded, validated evidence                    |
+| D024 | Treat retrieved document text as untrusted model input                    |
+| D025 | Keep Phase 7 deployment provider-neutral                                  |
+| D026 | Reject extraction work above explicit input budgets                       |
+| D027 | Use structured stdout logs and request IDs before an observability vendor |
+| D028 | Separate deterministic product tests from paid live smoke tests           |
+| D029 | Expose manual recovery before adding automatic retry infrastructure       |
+| D031 | Retry only transient Gemini failures at the provider boundary             |
+| D033 | Limit concurrency at the provider boundary and follow accepted retries    |
+| D034 | Treat the local frontend and API as one supervised process group          |
+| D037 | Validate sessions through Supabase Auth before optimizing with JWKS       |
+| D038 | Contract ownership only after an explicit transactional backfill          |
+
+## Detailed decision records
+
 ## D001 — Ship Stage 1 as one complete vertical slice
 
 **The decision** — Build Stage 1 around one end-to-end path: upload a document, preserve it, parse it, canonicalize it, enrich it, index it, and answer questions with source citations.
@@ -383,3 +452,76 @@ New decisions should be appended when a choice meaningfully affects architecture
 **The reasoning** — A repository migration cannot know who legitimately owns a pre-authentication corpus. An explicit dry run makes that human decision visible, while table locks and post-write verification prevent concurrent inserts from creating a gap during assignment. The final non-null and composite foreign-key constraints then turn the application rule into a database invariant.
 
 **What we deliberately cut** — Automatic storage-object moves, owner guessing, a general ownership-transfer interface, and multi-user distribution of the legacy corpus. The safe MVP operation assigns the known single-user corpus to one reviewed account; future sharing needs workspace semantics rather than another one-off backfill.
+
+## D039 — Enforce initial abuse limits with atomic Postgres admission counters
+
+**The decision** — Apply configurable fixed-window limits before upload, retry, and ask work begins. Store user, HMAC-hashed IP, document-cooldown, and global counters in Postgres; update them with conditional upserts inside one transaction; and compensate only accepted-upload document/byte reservations when acceptance does not complete.
+
+**The alternatives** — Keep limits in process memory; add Redis immediately; rely on provider quotas and UI throttling; or record usage after work completes.
+
+**The reasoning** — The API may eventually run in multiple processes, so an in-memory limiter can overshoot exactly when protection matters. Postgres is already the system of record and can make a small public-test workload atomic without another service. Reserving before expensive work fails closed under concurrency. Upload request units remain consumed because invalid and duplicate traffic still costs application capacity, while document and byte units are returned when no new document is accepted.
+
+**What we deliberately cut** — Sliding windows, Redis, a purchasable quota system, a user usage dashboard, and automatic limit increases. Fixed windows are understandable and operationally sufficient at MVP traffic; provider-attempt accounting remains a separate Phase 10C slice because it belongs inside retrying provider adapters.
+
+## D040 — Use restart-based kill switches and sanitized log alerts first
+
+**The decision** — Configure independent server-side switches through environment variables, expose only public booleans through a capabilities endpoint, and initially emit deduplicated 70/90/100 threshold alerts as structured logs. Hash the direct peer IP with an application secret and persist neither raw IPs nor corpus data in safeguard telemetry.
+
+**The alternatives** — Build an admin panel and database-backed runtime controls; trust frontend flags; store raw IPs for investigation; or wait for delayed provider dashboards before reacting.
+
+**The reasoning** — Environment changes plus restart/redeploy are slower than a control panel but have a much smaller authentication and lockout surface for the first public test. The API remains authoritative even if a caller bypasses the UI. HMAC buckets retain short-window correlation without keeping raw network identifiers. Structured logs fit the existing observability boundary and can feed the deployment platform selected later.
+
+**What we deliberately cut** — Admin roles, runtime control audit history, forwarded-IP trust, and a hard-coded email/webhook vendor. Public signup still requires disabling registrations in Supabase itself; an operator-visible alert destination and tested provider-side limits remain release gates rather than being falsely treated as solved by log output alone.
+
+## D041 — Meter every provider attempt and verify demo safety without live quota
+
+This decision supersedes D040's assumption that structured log alerts would be active in the
+first demo-ready release; the alert boundary is retained but not wired to a sink yet.
+
+**The decision** — Reserve durable per-user and global daily budgets immediately before every Unstructured job submission and Gemini extraction, document-embedding, query-embedding, or answer-generation attempt. Count adapter retries as new attempts, store only sanitized outcomes, and open a short in-memory circuit per provider operation after clustered network, `429`, or retryable `5xx` failures. Verify these controls with deterministic provider transports rather than live Gemini or Unstructured calls.
+
+**The alternatives** — Rely only on upload/ask admission limits; assume serialized parsing also bounds all downstream spend; count one unit per user action regardless of retries or chunk fan-out; use provider dashboards as the enforcement boundary; or exercise the controls by deliberately consuming live quota.
+
+**The reasoning** — One accepted document can create multiple provider calls, and internal retries can consume quota even when the user performed one action. Atomic Postgres reservations make the hard daily budget consistent across API workers, while a small per-process circuit stops a burst of transient provider failures from being amplified. Mocked HTTP responses prove exact retry and circuit behavior without spending the limited demo quota or depending on external availability.
+
+**What we deliberately cut** — External/server alert delivery, provider-dashboard alert configuration, production TLS/CORS rehearsal, deliberate quota exhaustion, and provider-key rotation rehearsal. The optional alert schema and interface remain dormant extension points; these operational exercises become required when the product moves from a supervised demo to unattended public production.
+
+## D042 — Expose generated API documentation only in development
+
+**The decision** — Show the homepage API-documentation link only in Vite development mode, and configure FastAPI to serve both Swagger UI and the OpenAPI schema only when `APP_ENV=development`. Every other environment, including test and production, receives neither `/docs` nor `/openapi.json`.
+
+**The alternatives** — Keep Swagger public because protected operations still require authentication; hide only the homepage link; disable Swagger UI while leaving `/openapi.json` public; or put the generated documentation behind application authentication.
+
+**The reasoning** — Swagger is valuable for local development but is not part of the end-user product. Authentication would still protect user data, yet a public schema unnecessarily advertises the complete internal API surface. Enforcing the rule independently in the frontend and API avoids both a dead production link and direct discovery of the schema.
+
+**What we deliberately cut** — Public developer documentation, an authenticated documentation portal, API keys for third-party developers, and a curated external API contract. Those should be designed deliberately if external API access becomes a product feature.
+
+## D043 — Build persistent multi-representation intelligence, not document chat alone
+
+**The decision** — Treat the product as persistent document-intelligence infrastructure rather than a chatbot that happens to accept files. Keep the original artifact, canonical structure, retrieval chunks, generic semantic records, embeddings, and provenance as complementary representations, and support structured, keyword, semantic, and grounded-answer access over the corpus.
+
+**The alternatives** — Send an uploaded file directly to an LLM for each conversation; build a vector-only RAG application containing text chunks and embeddings; or normalize every document immediately into one rigid business schema.
+
+**The reasoning** — One-off file chat can answer a question but does not create reusable, versioned knowledge that can be searched, audited, reprocessed, or combined across documents. Vector retrieval handles semantic similarity but is weak for exact structured questions, while a universal fixed schema would discard meaning from unknown domains. Multiple linked representations preserve source fidelity and allow each query mechanism to contribute where it is strongest.
+
+**What we deliberately cut** — Multi-turn conversational memory, a universal ontology, automatic domain-schema discovery, perfect cross-document entity resolution, and knowledge-graph traversal. They are not necessary to prove persistent ingestion, semantic enrichment, hybrid retrieval, and cited answers in Stage 1.
+
+## D044 — Preserve table structure alongside retrieval text
+
+**The decision** — Represent tables as canonical elements with their available structured payload, while also retaining a textual rendering that can participate in chunking and retrieval. Keep page and source-element provenance so table-derived evidence resolves back to the original document.
+
+**The alternatives** — Flatten every table permanently into plain text; store only parser-specific HTML or JSON; omit tables from retrieval; or design domain-specific relational tables for every uploaded table shape.
+
+**The reasoning** — Many high-value business facts live in tables, where row and column relationships carry meaning that plain text can lose. At the same time, retrieval and language models need a useful textual representation. Keeping both forms avoids choosing between structural fidelity and searchability, and the canonical boundary prevents one parser's output format from becoming the product contract.
+
+**What we deliberately cut** — Spreadsheet formula execution, universal table normalization, chart interpretation, cell-level editing, and automatic mapping of arbitrary tables into domain schemas. Those require format-specific semantics and quality evaluation beyond the MVP.
+
+## D045 — Use TanStack Query as the frontend server-state boundary
+
+**The decision** — Use TanStack Query for API-backed documents, processing state, capabilities, and question results, including caching, invalidation, mutations, and bounded polling. Keep transient presentation state in React rather than copying server records into a separate client store.
+
+**The alternatives** — Hand-build request lifecycles with `useEffect` and component state; introduce Redux or another global store for both client and server state; or rely on full-page refreshes after uploads and processing retries.
+
+**The reasoning** — Most changing frontend data is authoritative on the API, and document processing continues after the initiating request. A server-state library provides consistent loading and error behavior, request deduplication, cache invalidation, and lifecycle-aware polling without duplicating that machinery across screens. It also lets list and detail views converge on fresh durable status after background work completes.
+
+**What we deliberately cut** — A general global-state framework, normalized client-side entity storage, offline mutation queues, persistent browser caching, and real-time subscriptions. The current product needs reliable synchronization with one API, not a second data model in the browser.

@@ -28,6 +28,13 @@ _EXTRA_FIELDS = (
     "provider",
     "operation",
     "attempt",
+    "subject_type",
+    "subject_key",
+    "metric",
+    "threshold",
+    "used",
+    "limit",
+    "code",
 )
 
 

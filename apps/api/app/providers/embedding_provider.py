@@ -1,6 +1,7 @@
 """Application-owned embedding provider boundary."""
 
 from typing import Protocol
+from uuid import UUID
 
 from app.domain import ChunkVector, ExtractionChunk
 
@@ -15,6 +16,16 @@ class EmbeddingProvider(Protocol):
     model_version: str | None
     dimension: int
 
-    async def embed(self, chunks: tuple[ExtractionChunk, ...]) -> tuple[ChunkVector, ...]: ...
+    async def embed(
+        self,
+        chunks: tuple[ExtractionChunk, ...],
+        *,
+        user_id: UUID | None = None,
+    ) -> tuple[ChunkVector, ...]: ...
 
-    async def embed_query(self, query: str) -> tuple[float, ...]: ...
+    async def embed_query(
+        self,
+        query: str,
+        *,
+        user_id: UUID | None = None,
+    ) -> tuple[float, ...]: ...

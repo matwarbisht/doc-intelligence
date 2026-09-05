@@ -5,6 +5,7 @@ import hashlib
 import json
 from collections.abc import Mapping
 from typing import cast
+from uuid import UUID
 
 import httpx
 
@@ -14,6 +15,7 @@ from app.providers.document_parser import (
     ParsedDocument,
     ParsedElement,
 )
+from app.providers.provider_usage import ProviderUsageGuard
 
 
 class UnstructuredDocumentParser:
@@ -32,6 +34,7 @@ class UnstructuredDocumentParser:
         concurrency: int = 1,
         max_attempts: int = 3,
         retry_base_seconds: float = 1,
+        usage_guard: ProviderUsageGuard | None = None,
     ) -> None:
         self._client = client
         self._api_url = api_url.rstrip("/")
@@ -42,6 +45,7 @@ class UnstructuredDocumentParser:
         self._semaphore = asyncio.Semaphore(concurrency)
         self._max_attempts = max_attempts
         self._retry_base_seconds = retry_base_seconds
+        self._usage_guard = usage_guard
 
     async def parse(
         self,
@@ -49,6 +53,7 @@ class UnstructuredDocumentParser:
         filename: str,
         content_type: str,
         content: bytes,
+        user_id: UUID | None = None,
     ) -> ParsedDocument:
         try:
             async with asyncio.timeout(self._timeout_seconds):
@@ -57,6 +62,7 @@ class UnstructuredDocumentParser:
                         filename=filename,
                         content_type=content_type,
                         content=content,
+                        user_id=user_id,
                     )
                     completed_job = await self._wait_for_job(job)
                     payload = await self._download_output(completed_job)
@@ -81,12 +87,15 @@ class UnstructuredDocumentParser:
         filename: str,
         content_type: str,
         content: bytes,
+        user_id: UUID | None,
     ) -> Mapping[object, object]:
         response = await self._request(
             "POST",
             "/jobs/",
             data={"request_data": json.dumps({"template_id": self._template_id, "job_nodes": []})},
             files=[("input_files", (filename, content, content_type))],
+            metered_operation="job_submission",
+            user_id=user_id,
         )
         payload = self._json_object(response)
         if not isinstance(payload.get("id"), str):
@@ -150,8 +159,18 @@ class UnstructuredDocumentParser:
         data: dict[str, str] | None = None,
         files: list[tuple[str, tuple[str, bytes, str]]] | None = None,
         params: dict[str, str] | None = None,
+        metered_operation: str | None = None,
+        user_id: UUID | None = None,
     ) -> httpx.Response:
         for attempt in range(1, self._max_attempts + 1):
+            if metered_operation is not None and self._usage_guard is not None:
+                if user_id is None:
+                    raise RuntimeError("A user is required for metered provider work.")
+                await self._usage_guard.before_provider_attempt(
+                    user_id=user_id,
+                    provider="unstructured",
+                    operation=metered_operation,
+                )
             try:
                 response = await self._client.request(
                     method,
@@ -166,11 +185,27 @@ class UnstructuredDocumentParser:
                     params=params,
                 )
                 response.raise_for_status()
+                if metered_operation is not None and self._usage_guard is not None:
+                    await self._usage_guard.after_provider_attempt(
+                        user_id=cast(UUID, user_id),
+                        provider="unstructured",
+                        operation=metered_operation,
+                        status_code=response.status_code,
+                        succeeded=True,
+                    )
                 return response
             except httpx.HTTPError as error:
                 status = (
                     error.response.status_code if isinstance(error, httpx.HTTPStatusError) else None
                 )
+                if metered_operation is not None and self._usage_guard is not None:
+                    await self._usage_guard.after_provider_attempt(
+                        user_id=cast(UUID, user_id),
+                        provider="unstructured",
+                        operation=metered_operation,
+                        status_code=status,
+                        succeeded=False,
+                    )
                 transient = status is None or status in {429, 500, 502, 503, 504}
                 if transient and attempt < self._max_attempts:
                     await asyncio.sleep(self._retry_base_seconds * (2 ** (attempt - 1)))

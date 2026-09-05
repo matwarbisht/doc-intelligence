@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 from app.domain import GeneratedCitation, QueryResult, QueryType, RetrievalHit
 from app.providers import AnswerGenerator, EmbeddingProvider
 from app.repositories import QueryRepository
+from app.services.safeguard_service import SafeguardViolation
 
 logger = logging.getLogger(__name__)
 
@@ -83,12 +84,18 @@ class CorpusQueryService:
                 },
             )
             if evidence:
-                generated = await self._answer_generator.generate(normalized, evidence)
+                generated = await self._answer_generator.generate(
+                    normalized,
+                    evidence,
+                    user_id=user_id,
+                )
                 cited = self._resolve_citations(generated.citations, evidence)
                 answer = generated.answer
             else:
                 cited = ()
                 answer = "I couldn't find enough evidence in the ready documents to answer that."
+        except SafeguardViolation:
+            raise
         except Exception as error:
             raise QueryServiceError("The corpus query could not be completed.") from error
 
@@ -111,7 +118,7 @@ class CorpusQueryService:
     async def _semantic_search(
         self, query: str, *, user_id: UUID, document_id: UUID | None
     ) -> tuple[RetrievalHit, ...]:
-        vector = await self._embedding_provider.embed_query(query)
+        vector = await self._embedding_provider.embed_query(query, user_id=user_id)
         return await self._repository.search_semantic(
             vector,
             provider=self._embedding_provider.provider_name,

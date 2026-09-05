@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -56,6 +56,39 @@ class Settings(BaseSettings):
     gemini_retry_base_seconds: float = Field(default=0.5, ge=0, le=10)
     retrieval_candidate_limit: int = Field(default=10, ge=1, le=50)
     retrieval_max_sources: int = Field(default=8, ge=1, le=20)
+    public_signup_enabled: bool = True
+    uploads_enabled: bool = True
+    processing_enabled: bool = True
+    processing_retries_enabled: bool = True
+    ask_enabled: bool = True
+    user_uploads_per_hour: int = Field(default=10, ge=1)
+    user_documents_per_day: int = Field(default=25, ge=1)
+    user_upload_bytes_per_day: int = Field(default=262_144_000, ge=1)
+    user_asks_per_hour: int = Field(default=30, ge=1)
+    user_asks_per_day: int = Field(default=100, ge=1)
+    user_retries_per_hour: int = Field(default=5, ge=1)
+    user_retries_per_day: int = Field(default=10, ge=1)
+    user_max_documents: int = Field(default=100, ge=1)
+    retry_cooldown_seconds: int = Field(default=300, ge=1)
+    ip_uploads_per_hour: int = Field(default=30, ge=1)
+    ip_asks_per_hour: int = Field(default=120, ge=1)
+    ip_hash_salt: str = Field(default="local-development-only", min_length=16)
+    global_documents_per_day: int = Field(default=250, ge=1)
+    global_upload_bytes_per_day: int = Field(default=2_621_440_000, ge=1)
+    global_asks_per_day: int = Field(default=500, ge=1)
+    user_unstructured_attempts_per_day: int = Field(default=30, ge=1)
+    global_unstructured_attempts_per_day: int = Field(default=250, ge=1)
+    user_gemini_extractions_per_day: int = Field(default=30, ge=1)
+    global_gemini_extractions_per_day: int = Field(default=250, ge=1)
+    user_gemini_embedding_calls_per_day: int = Field(default=1_000, ge=1)
+    global_gemini_embedding_calls_per_day: int = Field(default=10_000, ge=1)
+    user_gemini_query_embeddings_per_day: int = Field(default=100, ge=1)
+    global_gemini_query_embeddings_per_day: int = Field(default=500, ge=1)
+    user_gemini_answers_per_day: int = Field(default=100, ge=1)
+    global_gemini_answers_per_day: int = Field(default=500, ge=1)
+    provider_circuit_failure_threshold: int = Field(default=5, ge=1)
+    provider_circuit_window_seconds: int = Field(default=60, ge=1)
+    provider_circuit_cooldown_seconds: int = Field(default=60, ge=1)
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -63,6 +96,12 @@ class Settings(BaseSettings):
         if isinstance(value, str) and not value.lstrip().startswith("["):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @model_validator(mode="after")
+    def require_production_ip_hash_salt(self) -> "Settings":
+        if self.app_env == "production" and len(self.ip_hash_salt) < 32:
+            raise ValueError("IP_HASH_SALT must contain at least 32 characters in production")
+        return self
 
 
 @lru_cache

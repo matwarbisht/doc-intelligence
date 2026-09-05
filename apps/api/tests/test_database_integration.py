@@ -48,6 +48,7 @@ class IntegrationParser:
         filename: str,
         content_type: str,
         content: bytes,
+        user_id: UUID | None = None,
     ) -> ParsedDocument:
         assert filename == "integration-parse.txt"
         assert content_type == "text/plain"
@@ -78,7 +79,12 @@ class IntegrationExtractor:
     prompt_version = "prompt-v1"
     schema_version = "schema-v1"
 
-    async def extract(self, chunks: tuple[ExtractionChunk, ...]) -> SemanticExtraction:
+    async def extract(
+        self,
+        chunks: tuple[ExtractionChunk, ...],
+        *,
+        user_id: UUID | None = None,
+    ) -> SemanticExtraction:
         chunk_id = chunks[0].id
         return SemanticExtraction(
             document_type="integration_report",
@@ -124,12 +130,22 @@ class IntegrationEmbeddings:
     model_version: str | None = "1"
     dimension = 768
 
-    async def embed(self, chunks: tuple[ExtractionChunk, ...]) -> tuple[ChunkVector, ...]:
+    async def embed(
+        self,
+        chunks: tuple[ExtractionChunk, ...],
+        *,
+        user_id: UUID | None = None,
+    ) -> tuple[ChunkVector, ...]:
         return tuple(
             ChunkVector(chunk_id=chunk.id, values=(1.0,) + (0.0,) * 767) for chunk in chunks
         )
 
-    async def embed_query(self, query: str) -> tuple[float, ...]:
+    async def embed_query(
+        self,
+        query: str,
+        *,
+        user_id: UUID | None = None,
+    ) -> tuple[float, ...]:
         return (1.0,) + (0.0,) * 767
 
 
@@ -140,7 +156,13 @@ class IntegrationAnswerGenerator:
     prompt_version = "answer-v1"
     schema_version = "answer-v1"
 
-    async def generate(self, question: str, evidence: tuple[RetrievalHit, ...]) -> GeneratedAnswer:
+    async def generate(
+        self,
+        question: str,
+        evidence: tuple[RetrievalHit, ...],
+        *,
+        user_id: UUID | None = None,
+    ) -> GeneratedAnswer:
         assert question == "What does the canonical output retain?"
         return GeneratedAnswer(
             answer="The canonical output retains provenance [1].",

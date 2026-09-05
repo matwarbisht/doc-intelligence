@@ -10,6 +10,7 @@ import {
 import { Link } from 'react-router';
 
 import { api } from '../../api/client';
+import { useCapabilities } from '../../api/useCapabilities';
 import { Button } from '../../components/Button/Button';
 import { Card } from '../../components/Card/Card';
 import styles from './DocumentsPage.module.scss';
@@ -34,6 +35,8 @@ export function DocumentsPage() {
   const [queue, setQueue] = useState<UploadQueueItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const capabilities = useCapabilities();
+  const uploadsEnabled = capabilities.data?.uploads !== false;
   const documents = useQuery({
     queryKey: documentsQueryKey,
     queryFn: ({ signal }) => api.listDocuments({ signal }),
@@ -43,6 +46,7 @@ export function DocumentsPage() {
         : false,
   });
   function addFiles(files: FileList | File[]) {
+    if (!uploadsEnabled) return;
     const selected = Array.from(files);
     if (!selected.length) return;
     setQueue((current) => {
@@ -74,7 +78,7 @@ export function DocumentsPage() {
   }
 
   async function uploadItems(items: UploadQueueItem[]) {
-    if (!items.length || isUploading) return;
+    if (!items.length || isUploading || !uploadsEnabled) return;
     setIsUploading(true);
     let nextIndex = 0;
 
@@ -141,7 +145,10 @@ export function DocumentsPage() {
         <div
           className={styles.dropzone}
           data-dragging={isDragging || undefined}
-          onDragEnter={() => !isUploading && setIsDragging(true)}
+          data-disabled={!uploadsEnabled || undefined}
+          onDragEnter={() =>
+            uploadsEnabled && !isUploading && setIsDragging(true)
+          }
           onDragLeave={() => setIsDragging(false)}
           onDragOver={(event) => event.preventDefault()}
           onDrop={handleDrop}
@@ -153,7 +160,7 @@ export function DocumentsPage() {
             accept=".pdf,.docx,.md,.markdown,.txt"
             multiple
             onChange={handleSelection}
-            disabled={isUploading}
+            disabled={isUploading || !uploadsEnabled}
           />
           <div className={styles.dropMark} aria-hidden="true">
             ↑
@@ -166,6 +173,13 @@ export function DocumentsPage() {
             Choose files
           </label>
         </div>
+
+        {!uploadsEnabled ? (
+          <p className={styles.notice} role="status">
+            New document uploads are temporarily unavailable. Your existing
+            library remains accessible.
+          </p>
+        ) : null}
 
         {queue.length ? (
           <section className={styles.uploadQueue} aria-live="polite">
@@ -187,7 +201,7 @@ export function DocumentsPage() {
                         ),
                       )
                     }
-                    disabled={isUploading}
+                    disabled={isUploading || !uploadsEnabled}
                   >
                     Clear completed
                   </Button>
@@ -196,7 +210,7 @@ export function DocumentsPage() {
                   <Button
                     variant="secondary"
                     onClick={() => void uploadItems(failed)}
-                    disabled={isUploading}
+                    disabled={isUploading || !uploadsEnabled}
                   >
                     Retry failed
                   </Button>
@@ -204,7 +218,7 @@ export function DocumentsPage() {
                 {pending.length ? (
                   <Button
                     onClick={() => void uploadItems(pending)}
-                    disabled={isUploading}
+                    disabled={isUploading || !uploadsEnabled}
                   >
                     {isUploading
                       ? 'Uploading…'

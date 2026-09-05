@@ -117,6 +117,21 @@ async def test_ownership_contract_applies_cleanly_without_mutating_the_test_data
     transaction = connection.transaction()
     await transaction.start()
     try:
+        # Recreate the pre-contract schema inside this rolled-back transaction so the
+        # migration is tested rather than blindly re-applied to an already-migrated DB.
+        await connection.execute(
+            "alter table public.queries drop constraint if exists queries_document_owner_fkey"
+        )
+        await connection.execute(
+            "alter table public.documents drop constraint if exists documents_id_owner_id_key"
+        )
+        await connection.execute(
+            """
+            alter table public.queries
+            add constraint queries_document_id_fkey
+            foreign key (document_id) references public.documents(id) on delete set null
+            """
+        )
         await connection.execute(OWNERSHIP_CONTRACT.read_text())
         document_owner_required = await connection.fetchval(
             """

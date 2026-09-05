@@ -6,7 +6,13 @@ import styles from './HomePage.module.scss';
 
 const apiBaseUrl = import.meta.env.VITE_API_URL ?? DEFAULT_API_BASE_URL;
 
-export function HomePage() {
+interface HomePageProps {
+  showApiDocumentation?: boolean;
+}
+
+export function HomePage({
+  showApiDocumentation = import.meta.env.DEV,
+}: HomePageProps) {
   return (
     <div className={styles.page}>
       <section className={styles.hero}>
@@ -23,9 +29,11 @@ export function HomePage() {
             <Link className={styles.primaryLink} to="/documents">
               Open document library
             </Link>
-            <a className={styles.secondaryLink} href={`${apiBaseUrl}/docs`}>
-              API documentation
-            </a>
+            {showApiDocumentation ? (
+              <a className={styles.secondaryLink} href={`${apiBaseUrl}/docs`}>
+                API documentation
+              </a>
+            ) : null}
           </div>
         </div>
       </section>

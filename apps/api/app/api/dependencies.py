@@ -12,6 +12,7 @@ from app.services import (
     CorpusQueryService,
     DocumentProcessor,
     DocumentService,
+    SafeguardService,
     SuspendedAccountError,
 )
 
@@ -93,5 +94,15 @@ def get_query_service(request: Request) -> CorpusQueryService:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Corpus querying is not configured.",
+        )
+    return service
+
+
+def get_safeguard_service(request: Request) -> SafeguardService:
+    service = cast(SafeguardService | None, getattr(request.app.state, "safeguard_service", None))
+    if service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Safeguards are not configured.",
         )
     return service

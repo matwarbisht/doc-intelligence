@@ -1,7 +1,7 @@
 # Authentication and Abuse-Prevention Implementation Plan
 
-**Status:** In progress; identity and ownership implemented, abuse controls planned
-**Scope:** Post-Stage-1 MVP hardening for a limited public test
+**Status:** Demo-ready scope implemented; production operations explicitly deferred
+**Scope:** Post-Stage-1 MVP hardening for a controlled demo
 **Last updated:** September 5, 2026
 
 ## 1. Purpose
@@ -9,8 +9,20 @@
 Before Phase 10, Document Intelligence behaved as a single-user application: every API caller
 could upload, list, inspect, process, retry, and query the same corpus. Phases 10A and 10B now
 establish identity, isolate user-owned data, and enforce ownership at the database boundary.
-The remaining work addresses sustained consumption of project-owned Unstructured and Gemini
-quotas during a limited public test.
+The implemented safeguards address sustained consumption of project-owned Unstructured and
+Gemini quotas during a controlled demo.
+
+### Demo-ready scope decision
+
+The application controls in this plan are implemented and verified without real provider
+traffic: authentication and ownership, request admission limits, hard provider-attempt budgets,
+manual capability switches, sanitized telemetry, and short automatic provider circuits.
+
+Server/external alert delivery, provider-dashboard alerts, production TLS/CORS validation,
+deliberate quota-exhaustion testing, and provider-key rotation rehearsal are deferred until the
+product is being made production-ready. The alert schema and interface remain as extension
+points, but no alert sink is active in the current application wiring. This means the current
+state is suitable for a supervised demo, not unattended public production traffic.
 
 This phase will add:
 
@@ -20,7 +32,7 @@ This phase will add:
 - Per-user, per-IP, and global limits for expensive actions.
 - Automatic provider-budget circuit breakers.
 - Manual kill switches for signups, uploads, processing, retries, and questions.
-- Operator-visible usage, threshold alerts, and response runbooks.
+- Operator-inspectable sanitized usage and response runbooks.
 - An identity model that can later support verified email, password recovery, magic links,
   OAuth, account linking, workspaces, and administrative tooling.
 
@@ -738,7 +750,7 @@ bypassed with a direct API request.
 **Exit criteria:** Parallel requests cannot overshoot limits; another account cannot consume or
 inspect a user's allowance; rejected requests never start provider work.
 
-### Phase H — Add provider accounting and circuits
+### Phase H — Add provider accounting and circuits (complete)
 
 - Gate each provider attempt, including internal retries.
 - Attribute asynchronous processing to the owning user.
@@ -749,7 +761,7 @@ inspect a user's allowance; rejected requests never start provider work.
 **Exit criteria:** A synthetic low budget deterministically blocks the next provider call while
 read-only endpoints continue working.
 
-### Phase I — Add alerts and operational verification
+### Phase I — Add alerts and production operational verification (deferred)
 
 - Emit deduplicated 70%, 90%, and 100% structured alerts.
 - Implement the chosen external alert sink if one is selected; otherwise document deployment
@@ -757,10 +769,10 @@ read-only endpoints continue working.
 - Configure Gemini caps/budget alerts and verify Unstructured dashboard access.
 - Exercise the incident runbooks using test limits and non-sensitive documents.
 
-**Exit criteria:** The operator receives a test alert, can identify the affected capability,
-can disable it, and can verify that no further provider work starts.
+**Exit criteria for production readiness:** The operator receives a test alert, can identify the
+affected capability, can disable it, and can verify that no further provider work starts.
 
-### Phase J — Public-test rollout
+### Phase J — Unattended public/production rollout (deferred)
 
 - Deploy behind TLS with production CORS origins only.
 - Use separate public-test provider credentials/projects where possible.
@@ -892,7 +904,7 @@ version—not restoring the pre-auth behavior.
 
 ## 19. Definition of done
 
-This phase is complete only when:
+The controlled-demo scope is complete when:
 
 - A user can register, sign in, restore a session, and sign out with email/password.
 - Public signup can be shut down authoritatively.
@@ -904,12 +916,13 @@ This phase is complete only when:
 - Provider attempts, including retries and background work, respect global budgets.
 - Expensive capabilities stop automatically at configured hard limits.
 - Manual switches independently disable signup, uploads, processing, retries, and ask.
-- Threshold alerts are deduplicated, sanitized, and delivered to an operator-visible channel.
-- Provider-side spend/quota controls are configured where available.
-- The operator has tested signup shutdown, provider shutdown, key rotation, and recovery.
 - CI passes without real provider credentials or paid provider calls.
 - `decisions.md`, `.env.example`, architecture, deployment, and operations documentation match
   the implemented behavior.
+
+Before unattended public or production traffic, additionally require operator-visible server
+alerts, provider-dashboard alerts/caps where available, production TLS/CORS validation, and
+rehearsed shutdown, recovery, quota-exhaustion, and key-rotation procedures.
 
 ## 20. Deliberately excluded from this implementation
 

@@ -6,7 +6,12 @@ from uuid import UUID, uuid4
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.api.dependencies import get_current_user, get_document_service, get_query_service
+from app.api.dependencies import (
+    get_current_user,
+    get_document_service,
+    get_query_service,
+    get_safeguard_service,
+)
 from app.api.routes.queries import router
 from app.domain import (
     AuthenticatedUser,
@@ -17,7 +22,11 @@ from app.domain import (
     RetrievalHit,
 )
 from app.services import DocumentService
-from tests.fakes import InMemoryDocumentRepository, InMemoryObjectStorage
+from tests.fakes import (
+    InMemoryDocumentRepository,
+    InMemoryObjectStorage,
+    unrestricted_safeguards,
+)
 
 TEST_USER = AuthenticatedUser(
     id=UUID("10000000-0000-4000-8000-000000000001"), email="alice@example.test"
@@ -67,6 +76,7 @@ def test_query_endpoint_returns_answer_and_source_provenance() -> None:
         InMemoryDocumentRepository(), InMemoryObjectStorage()
     )
     application.dependency_overrides[get_current_user] = lambda: TEST_USER
+    application.dependency_overrides[get_safeguard_service] = unrestricted_safeguards
     client = TestClient(application)
 
     try:
@@ -101,6 +111,7 @@ def test_query_endpoint_requires_configuration() -> None:
         InMemoryDocumentRepository(), InMemoryObjectStorage()
     )
     application.dependency_overrides[get_current_user] = lambda: TEST_USER
+    application.dependency_overrides[get_safeguard_service] = unrestricted_safeguards
     client = TestClient(application)
 
     try:
@@ -121,6 +132,7 @@ def test_query_endpoint_forwards_document_scope() -> None:
     document_service = DocumentService(repository, InMemoryObjectStorage())
     application.dependency_overrides[get_document_service] = lambda: document_service
     application.dependency_overrides[get_current_user] = lambda: TEST_USER
+    application.dependency_overrides[get_safeguard_service] = unrestricted_safeguards
     client = TestClient(application)
     document_id = uuid4()
     now = datetime.now(UTC)
@@ -159,6 +171,7 @@ def test_query_endpoint_rejects_another_users_document_scope() -> None:
     application.dependency_overrides[get_query_service] = lambda: service
     application.dependency_overrides[get_document_service] = lambda: document_service
     application.dependency_overrides[get_current_user] = lambda: TEST_USER
+    application.dependency_overrides[get_safeguard_service] = unrestricted_safeguards
     document_id = uuid4()
     now = datetime.now(UTC)
     repository.documents[document_id] = Document(

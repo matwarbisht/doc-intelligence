@@ -119,6 +119,12 @@
   border-radius: var(--radius-md);
 }
 
+.notice {
+  margin: var(--space-4) 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
 .result {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(20rem, 0.85fr);

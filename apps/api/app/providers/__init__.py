@@ -19,6 +19,7 @@ from app.providers.gemini import (
     GeminiSemanticExtractor,
 )
 from app.providers.object_storage import ObjectStorage, ObjectStorageError
+from app.providers.provider_usage import ProviderUsageGuard
 from app.providers.semantic_extractor import SemanticExtractionError, SemanticExtractor
 from app.providers.supabase_auth import SupabaseAuthenticationProvider
 from app.providers.supabase_storage import SupabaseObjectStorage
@@ -41,6 +42,7 @@ __all__ = [
     "ObjectStorageError",
     "ParsedDocument",
     "ParsedElement",
+    "ProviderUsageGuard",
     "SupabaseObjectStorage",
     "SupabaseAuthenticationProvider",
     "SemanticExtractionError",

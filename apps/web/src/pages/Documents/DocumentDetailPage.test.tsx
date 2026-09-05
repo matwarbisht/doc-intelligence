@@ -11,64 +11,76 @@ afterEach(() => {
 it('renders semantic intelligence with cited source text', async () => {
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          id: 'doc-1',
-          filename: 'report.txt',
-          mime_type: 'text/plain',
-          status: 'ready',
-          size_bytes: 42,
-          created_at: '2026-09-04T00:00:00Z',
-          updated_at: '2026-09-04T00:00:00Z',
-          processing: [
-            {
-              stage: 'extracting',
-              status: 'succeeded',
-              progress: 1,
-              attempts: 1,
-              error: null,
-            },
-          ],
-          extraction: {
-            status: 'succeeded',
-            document_type: 'financial_report',
-            summary: 'Revenue grew during the quarter.',
-            topics: ['revenue'],
-          },
-          entities: [
-            {
-              id: 'entity-1',
-              canonical_name: 'Acme',
-              entity_type: 'organization',
-              normalized_value: null,
-            },
-          ],
-          facts: [
-            {
-              id: 'fact-1',
-              source_chunk_id: 'chunk-1',
-              subject: 'Acme',
-              predicate: 'revenue_growth',
-              object_value: '24%',
-              qualifiers: {},
-              confidence: 0.9,
-            },
-          ],
-          relationships: [],
-          sources: [
-            {
-              chunk_id: 'chunk-1',
-              filename: 'report.txt',
-              page_start: 2,
-              page_end: 2,
-              excerpt: 'Revenue grew by 24%.',
-            },
-          ],
-          chunk_count: 1,
-          embedding_count: 1,
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
+    vi.fn().mockImplementation((url: string) =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify(
+            url.endsWith('/capabilities')
+              ? {
+                  public_signup: true,
+                  uploads: true,
+                  processing: true,
+                  processing_retries: true,
+                  ask: true,
+                }
+              : {
+                  id: 'doc-1',
+                  filename: 'report.txt',
+                  mime_type: 'text/plain',
+                  status: 'ready',
+                  size_bytes: 42,
+                  created_at: '2026-09-04T00:00:00Z',
+                  updated_at: '2026-09-04T00:00:00Z',
+                  processing: [
+                    {
+                      stage: 'extracting',
+                      status: 'succeeded',
+                      progress: 1,
+                      attempts: 1,
+                      error: null,
+                    },
+                  ],
+                  extraction: {
+                    status: 'succeeded',
+                    document_type: 'financial_report',
+                    summary: 'Revenue grew during the quarter.',
+                    topics: ['revenue'],
+                  },
+                  entities: [
+                    {
+                      id: 'entity-1',
+                      canonical_name: 'Acme',
+                      entity_type: 'organization',
+                      normalized_value: null,
+                    },
+                  ],
+                  facts: [
+                    {
+                      id: 'fact-1',
+                      source_chunk_id: 'chunk-1',
+                      subject: 'Acme',
+                      predicate: 'revenue_growth',
+                      object_value: '24%',
+                      qualifiers: {},
+                      confidence: 0.9,
+                    },
+                  ],
+                  relationships: [],
+                  sources: [
+                    {
+                      chunk_id: 'chunk-1',
+                      filename: 'report.txt',
+                      page_start: 2,
+                      page_end: 2,
+                      excerpt: 'Revenue grew by 24%.',
+                    },
+                  ],
+                  chunk_count: 1,
+                  embedding_count: 1,
+                },
+          ),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
       ),
     ),
   );
@@ -130,7 +142,21 @@ it('offers retry recovery for a failed processing stage', async () => {
   };
   const fetchMock = vi
     .fn()
-    .mockImplementation((_url: string, init?: RequestInit) => {
+    .mockImplementation((url: string, init?: RequestInit) => {
+      if (url.endsWith('/capabilities')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              public_signup: true,
+              uploads: true,
+              processing: true,
+              processing_retries: true,
+              ask: true,
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          ),
+        );
+      }
       if (init?.method === 'POST') {
         retryAccepted = true;
         return Promise.resolve(

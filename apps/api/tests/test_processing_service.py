@@ -32,6 +32,7 @@ class FakeParser:
         filename: str,
         content_type: str,
         content: bytes,
+        user_id: UUID | None = None,
     ) -> ParsedDocument:
         if self.fails:
             raise DocumentParserError("parser unavailable")

@@ -16,7 +16,12 @@ from fastapi import (
     status,
 )
 
-from app.api.dependencies import get_current_user, get_document_service, get_processing_service
+from app.api.dependencies import (
+    get_current_user,
+    get_document_service,
+    get_processing_service,
+    get_safeguard_service,
+)
 from app.core.config import get_settings
 from app.domain import AuthenticatedUser
 from app.providers import ObjectStorageError
@@ -33,6 +38,7 @@ from app.services import (
     DocumentUploadError,
     EmptyDocumentError,
     FileTooLargeError,
+    SafeguardService,
     UnsupportedDocumentTypeError,
 )
 
@@ -43,6 +49,7 @@ ProcessingServiceDependency = Annotated[
     Depends(get_processing_service),
 ]
 CurrentUserDependency = Annotated[AuthenticatedUser, Depends(get_current_user)]
+SafeguardServiceDependency = Annotated[SafeguardService, Depends(get_safeguard_service)]
 
 
 @router.post("", response_model=DocumentUploadResponse, status_code=status.HTTP_201_CREATED)
@@ -53,10 +60,14 @@ async def upload_document(
     background_tasks: BackgroundTasks,
     service: DocumentServiceDependency,
     current_user: CurrentUserDependency,
+    safeguards: SafeguardServiceDependency,
 ) -> DocumentUploadResponse:
+    source_ip = request.client.host if request.client else None
+    await safeguards.guard_upload_request(current_user.id, source_ip)
     settings = get_settings()
     content = await file.read(settings.max_upload_bytes + 1)
     await file.close()
+    reservation = await safeguards.reserve_upload(current_user.id, source_ip, len(content))
 
     try:
         result = await service.upload(
@@ -66,33 +77,42 @@ async def upload_document(
             content=content,
         )
     except EmptyDocumentError as error:
+        await safeguards.release_upload(current_user.id, source_ip, reservation)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
     except FileTooLargeError as error:
+        await safeguards.release_upload(current_user.id, source_ip, reservation)
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=str(error),
         ) from error
     except UnsupportedDocumentTypeError as error:
+        await safeguards.release_upload(current_user.id, source_ip, reservation)
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail=str(error),
         ) from error
     except DocumentUploadError as error:
+        await safeguards.release_upload(current_user.id, source_ip, reservation)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(error),
         ) from error
     except ObjectStorageError as error:
+        await safeguards.release_upload(current_user.id, source_ip, reservation)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Document storage is temporarily unavailable.",
         ) from error
+    except Exception:
+        await safeguards.release_upload(current_user.id, source_ip, reservation)
+        raise
 
     if result.duplicate:
+        await safeguards.release_upload(current_user.id, source_ip, reservation)
         response.status_code = status.HTTP_200_OK
     else:
         processing_service = getattr(request.app.state, "processing_service", None)
-        if isinstance(processing_service, DocumentProcessor):
+        if safeguards.processing_enabled() and isinstance(processing_service, DocumentProcessor):
             background_tasks.add_task(
                 processing_service.process_document,
                 result.document.id,
@@ -114,6 +134,8 @@ async def process_document(
     service: ProcessingServiceDependency,
     document_service: DocumentServiceDependency,
     current_user: CurrentUserDependency,
+    request: Request,
+    safeguards: SafeguardServiceDependency,
 ) -> DocumentProcessResponse:
     document = await document_service.get_document(current_user.id, document_id)
     if document is None:
@@ -121,6 +143,8 @@ async def process_document(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found.",
         )
+    source_ip = request.client.host if request.client else None
+    await safeguards.guard_retry(current_user.id, source_ip, document_id)
     background_tasks.add_task(service.process_document, document_id)
     return DocumentProcessResponse(document_id=document_id)
 
