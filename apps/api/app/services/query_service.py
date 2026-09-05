@@ -43,16 +43,24 @@ class CorpusQueryService:
         self._candidate_limit = candidate_limit
         self._max_sources = max_sources
 
-    async def query(self, question: str) -> QueryResult:
+    async def query(self, question: str, *, document_id: UUID | None = None) -> QueryResult:
         normalized = " ".join(question.split())
         if not normalized:
             raise EmptyQueryError("Question must not be empty.")
 
         try:
             keyword, semantic, structured = await asyncio.gather(
-                self._repository.search_keyword(normalized, limit=self._candidate_limit),
-                self._semantic_search(normalized),
-                self._repository.search_structured(normalized, limit=self._candidate_limit),
+                self._repository.search_keyword(
+                    normalized,
+                    document_id=document_id,
+                    limit=self._candidate_limit,
+                ),
+                self._semantic_search(normalized, document_id=document_id),
+                self._repository.search_structured(
+                    normalized,
+                    document_id=document_id,
+                    limit=self._candidate_limit,
+                ),
             )
             evidence = self._fuse(keyword, semantic, structured)[: self._max_sources]
             logger.info(
@@ -63,6 +71,7 @@ class CorpusQueryService:
                     "semantic_hits": len(semantic),
                     "structured_hits": len(structured),
                     "fused_hits": len(evidence),
+                    "scope_document_id": str(document_id) if document_id else None,
                 },
             )
             if evidence:
@@ -79,6 +88,7 @@ class CorpusQueryService:
             id=uuid4(),
             query=normalized,
             query_type=QueryType.HYBRID,
+            document_id=document_id,
             answer=answer,
             sources=cited,
             created_at=datetime.now(UTC),
@@ -89,13 +99,16 @@ class CorpusQueryService:
             raise QueryServiceError("The corpus query could not be recorded.") from error
         return result
 
-    async def _semantic_search(self, query: str) -> tuple[RetrievalHit, ...]:
+    async def _semantic_search(
+        self, query: str, *, document_id: UUID | None
+    ) -> tuple[RetrievalHit, ...]:
         vector = await self._embedding_provider.embed_query(query)
         return await self._repository.search_semantic(
             vector,
             provider=self._embedding_provider.provider_name,
             model_name=self._embedding_provider.model_name,
             dimension=self._embedding_provider.dimension,
+            document_id=document_id,
             limit=self._candidate_limit,
         )
 

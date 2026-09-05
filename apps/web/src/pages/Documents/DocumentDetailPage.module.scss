@@ -53,6 +53,28 @@
   align-items: center;
   gap: var(--space-3);
 }
+.askLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.25rem;
+  padding-inline: var(--space-4);
+  color: var(--color-primary-foreground);
+  background: var(--color-primary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+.askLink:hover {
+  background: var(--color-primary-hover);
+}
+.askLink:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
 .retryError {
   margin: calc(var(--space-4) * -1) 0 var(--space-6);
   padding: var(--space-3);

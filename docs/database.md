@@ -36,7 +36,8 @@ documents
 - `entities` and `entity_mentions`: normalized entities and their evidence locations.
 - `facts`: flexible subject-predicate-object facts with source chunks.
 - `relationships`: entity relationships or entity-to-text relationships with source chunks.
-- `queries`: minimal query history for MVP diagnostics and later evaluation.
+- `queries`: minimal query history, including an optional document scope, for MVP
+  diagnostics and later evaluation.
 
 ## Embedding strategy
 
@@ -46,7 +47,10 @@ Phase 5 fixes the default MVP embedding configuration to Gemini `gemini-embeddin
 
 ## Migrations
 
-The first migration creates the public schema and enables pgvector. The second configures a private `documents` Storage bucket with a 50 MB limit for supported Stage 1 file types. Later migrations add retry-safe processing-stage constraints and the filtered semantic vector index.
+The first migration creates the public schema and enables pgvector. The second
+configures a private `documents` Storage bucket with a 50 MB limit for supported
+Stage 1 file types. Later migrations add retry-safe processing-stage constraints,
+the filtered semantic vector index, and the optional query-to-document scope.
 
 Apply migrations through the Supabase CLI or the project's hosted Supabase migration workflow. To verify an already-migrated database from the API test suite:
 

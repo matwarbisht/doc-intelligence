@@ -3,9 +3,9 @@ import {
   createDocumentApiClient,
   DEFAULT_API_BASE_URL,
 } from '@doc-intelligence/api-client';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 
 import { Button } from '../../components/Button/Button';
 import { Card } from '../../components/Card/Card';
@@ -18,14 +18,51 @@ const client = createDocumentApiClient(
 
 export function QueryPage() {
   const [question, setQuestion] = useState('');
-  const queryMutation = useMutation({
-    mutationFn: (value: string) => client.queryCorpus(value),
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedDocumentId = searchParams.get('document') ?? '';
+  const documents = useQuery({
+    queryKey: ['documents', 'query-scope'],
+    queryFn: ({ signal }) => client.listDocuments({ signal }),
   });
+  const queryMutation = useMutation({
+    mutationFn: ({
+      value,
+      documentId,
+    }: {
+      value: string;
+      documentId: string;
+    }) =>
+      client.queryCorpus(value, {
+        documentId: documentId || undefined,
+      }),
+  });
+  const readyDocuments =
+    documents.data?.items.filter((document) => document.status === 'ready') ??
+    [];
+  const selectedDocument = readyDocuments.find(
+    (document) => document.id === selectedDocumentId,
+  );
+  const scopeLabel = selectedDocumentId
+    ? (selectedDocument?.filename ?? 'Selected document')
+    : 'All documents';
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalized = question.trim();
-    if (normalized) queryMutation.mutate(normalized);
+    if (normalized) {
+      queryMutation.mutate({
+        value: normalized,
+        documentId: selectedDocumentId,
+      });
+    }
+  }
+
+  function changeScope(documentId: string) {
+    const next = new URLSearchParams(searchParams);
+    if (documentId) next.set('document', documentId);
+    else next.delete('document');
+    setSearchParams(next, { replace: true });
+    queryMutation.reset();
   }
 
   const errorMessage = queryMutation.error
@@ -47,13 +84,50 @@ export function QueryPage() {
 
       <Card className={styles.queryCard}>
         <form onSubmit={submit}>
+          <div className={styles.scopeField}>
+            <label htmlFor="query-scope">Answer scope</label>
+            <div className={styles.scopeControl}>
+              <select
+                id="query-scope"
+                value={selectedDocumentId}
+                onChange={(event) => changeScope(event.target.value)}
+                disabled={documents.isPending || queryMutation.isPending}
+              >
+                <option value="">All documents</option>
+                {selectedDocumentId && !selectedDocument ? (
+                  <option value={selectedDocumentId}>
+                    Selected document unavailable
+                  </option>
+                ) : null}
+                {readyDocuments.map((document) => (
+                  <option key={document.id} value={document.id}>
+                    {document.filename}
+                  </option>
+                ))}
+              </select>
+              {selectedDocumentId ? (
+                <Button variant="ghost" onClick={() => changeScope('')}>
+                  Clear scope
+                </Button>
+              ) : null}
+            </div>
+            <p>
+              {selectedDocumentId
+                ? `Answers will use only ${scopeLabel}.`
+                : 'Answers may use evidence from every ready document.'}
+            </p>
+          </div>
           <label htmlFor="corpus-question">Question</label>
           <div className={styles.controls}>
             <Input
               id="corpus-question"
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
-              placeholder="What do these documents say about…?"
+              placeholder={
+                selectedDocumentId
+                  ? `Ask about ${scopeLabel}…`
+                  : 'What do these documents say about…?'
+              }
               maxLength={2000}
               disabled={queryMutation.isPending}
             />
@@ -76,7 +150,7 @@ export function QueryPage() {
         <section className={styles.result} aria-live="polite">
           <Card className={styles.answer}>
             <p className={styles.eyebrow}>
-              Answer · {queryMutation.data.query_type}
+              Answer · {scopeLabel} · {queryMutation.data.query_type}
             </p>
             <p>{queryMutation.data.answer}</p>
           </Card>

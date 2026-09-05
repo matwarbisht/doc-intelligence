@@ -63,6 +63,8 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
                     dimension=settings.gemini_embedding_dimension,
                     timeout_seconds=settings.gemini_timeout_seconds,
                     concurrency=settings.gemini_embedding_concurrency,
+                    max_attempts=settings.gemini_max_attempts,
+                    retry_base_seconds=settings.gemini_retry_base_seconds,
                 )
                 application.state.query_service = CorpusQueryService(
                     PostgresQueryRepository(pool),
@@ -72,6 +74,8 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
                         api_key=settings.gemini_api_key,
                         model_name=settings.gemini_answer_model,
                         timeout_seconds=settings.gemini_timeout_seconds,
+                        max_attempts=settings.gemini_max_attempts,
+                        retry_base_seconds=settings.gemini_retry_base_seconds,
                     ),
                     candidate_limit=settings.retrieval_candidate_limit,
                     max_sources=settings.retrieval_max_sources,
@@ -102,6 +106,8 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
                             api_key=settings.gemini_api_key,
                             model_name=settings.gemini_extraction_model,
                             timeout_seconds=settings.gemini_timeout_seconds,
+                            max_attempts=settings.gemini_max_attempts,
+                            retry_base_seconds=settings.gemini_retry_base_seconds,
                         ),
                         embedding_provider,
                         max_attempts=settings.processing_max_attempts,

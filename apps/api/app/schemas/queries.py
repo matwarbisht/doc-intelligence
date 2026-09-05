@@ -12,6 +12,7 @@ class CorpusQueryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     query: str = Field(min_length=1, max_length=2_000)
+    document_id: UUID | None = None
 
 
 class QuerySourceResponse(BaseModel):
@@ -31,6 +32,7 @@ class CorpusQueryResponse(BaseModel):
     id: UUID
     query: str
     query_type: QueryType
+    document_id: UUID | None
     answer: str
     sources: list[QuerySourceResponse]
     created_at: datetime
@@ -41,6 +43,7 @@ class CorpusQueryResponse(BaseModel):
             id=result.id,
             query=result.query,
             query_type=result.query_type,
+            document_id=result.document_id,
             answer=result.answer,
             sources=[
                 QuerySourceResponse(

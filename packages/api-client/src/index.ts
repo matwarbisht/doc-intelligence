@@ -119,6 +119,7 @@ export interface CorpusQueryResponse {
   id: string;
   query: string;
   query_type: QueryType;
+  document_id: string | null;
   answer: string;
   sources: QuerySource[];
   created_at: string;
@@ -137,7 +138,7 @@ export class ApiError extends Error {
 export interface DocumentApiClient {
   queryCorpus(
     query: string,
-    options?: { signal?: AbortSignal },
+    options?: { documentId?: string; signal?: AbortSignal },
   ): Promise<CorpusQueryResponse>;
   listDocuments(options?: {
     signal?: AbortSignal;
@@ -162,11 +163,14 @@ export function createDocumentApiClient(
   const apiUrl = baseUrl.replace(/\/$/, '');
 
   return {
-    queryCorpus: (query, { signal } = {}) =>
+    queryCorpus: (query, { documentId, signal } = {}) =>
       request<CorpusQueryResponse>(`${apiUrl}/api/v1/query`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({
+          query,
+          ...(documentId ? { document_id: documentId } : {}),
+        }),
         signal,
       }),
 

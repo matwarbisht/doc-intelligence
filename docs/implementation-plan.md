@@ -72,3 +72,15 @@ Phase 2 is complete when a fresh checkout can start Supabase, rebuild the schema
 - Document production configuration and the current background-task runtime constraint.
 - Validate the complete upload-to-cited-answer user flow locally and with the optional
   provider-backed `make live-e2e` smoke test.
+
+## Phase 8 — Enhancement: scoped question answering (complete)
+
+- Keep global corpus questioning as the default `/ask` experience.
+- Let users constrain an answer to one ready document with a visible scope selector.
+- Provide both an “All documents” selector option and an explicit clear-scope action.
+- Persist the scope in the URL as `/ask?document=<document-id>` so it survives refreshes
+  and can be linked directly.
+- Add an “Ask about this document” entry point to ready document-detail pages.
+- Enforce the optional document scope in keyword, semantic, and structured retrieval
+  before fusion and answer generation.
+- Retain the selected document ID in query history for diagnostics and evaluation.

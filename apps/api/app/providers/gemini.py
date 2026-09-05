@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import math
 from collections.abc import Mapping
 from typing import cast
@@ -21,12 +22,62 @@ from app.providers.embedding_provider import EmbeddingProviderError
 from app.providers.semantic_extractor import SemanticExtractionError
 
 GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
+_TRANSIENT_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+logger = logging.getLogger(__name__)
 
 
 def _gemini_http_error(operation: str, error: httpx.HTTPError) -> str:
     status = error.response.status_code if isinstance(error, httpx.HTTPStatusError) else None
     detail = f" with status {status}" if status is not None else ""
     return f"Gemini {operation} failed{detail}."
+
+
+async def _post_with_retry(
+    client: httpx.AsyncClient,
+    *,
+    url: str,
+    api_key: str,
+    payload: object,
+    timeout_seconds: float,
+    operation: str,
+    max_attempts: int,
+    retry_base_seconds: float,
+) -> httpx.Response:
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = await client.post(
+                url,
+                headers={"x-goog-api-key": api_key},
+                json=payload,
+                timeout=timeout_seconds,
+            )
+            response.raise_for_status()
+            return response
+        except httpx.HTTPError as error:
+            if attempt == max_attempts or not _is_transient(error):
+                raise
+            logger.warning(
+                "Retrying transient provider request",
+                extra={
+                    "event": "provider.request.retrying",
+                    "provider": "gemini",
+                    "operation": operation,
+                    "attempt": attempt,
+                    "status_code": (
+                        error.response.status_code
+                        if isinstance(error, httpx.HTTPStatusError)
+                        else None
+                    ),
+                },
+            )
+            await asyncio.sleep(retry_base_seconds * (2 ** (attempt - 1)))
+    raise RuntimeError("unreachable")
+
+
+def _is_transient(error: httpx.HTTPError) -> bool:
+    if isinstance(error, httpx.HTTPStatusError):
+        return error.response.status_code in _TRANSIENT_STATUS_CODES
+    return isinstance(error, httpx.RequestError)
 
 
 class GeminiSemanticExtractor:
@@ -42,11 +93,15 @@ class GeminiSemanticExtractor:
         api_key: str,
         model_name: str = "gemini-2.5-flash",
         timeout_seconds: float = 120,
+        max_attempts: int = 3,
+        retry_base_seconds: float = 0.5,
     ) -> None:
         self._client = client
         self._api_key = api_key
         self.model_name = model_name
         self._timeout_seconds = timeout_seconds
+        self._max_attempts = max_attempts
+        self._retry_base_seconds = retry_base_seconds
 
     async def extract(self, chunks: tuple[ExtractionChunk, ...]) -> SemanticExtraction:
         payload = {
@@ -63,13 +118,16 @@ class GeminiSemanticExtractor:
             },
         }
         try:
-            response = await self._client.post(
-                f"{GEMINI_API_BASE_URL}/models/{self.model_name}:generateContent",
-                headers={"x-goog-api-key": self._api_key},
-                json=payload,
-                timeout=self._timeout_seconds,
+            response = await _post_with_retry(
+                self._client,
+                url=f"{GEMINI_API_BASE_URL}/models/{self.model_name}:generateContent",
+                api_key=self._api_key,
+                payload=payload,
+                timeout_seconds=self._timeout_seconds,
+                operation="extraction",
+                max_attempts=self._max_attempts,
+                retry_base_seconds=self._retry_base_seconds,
             )
-            response.raise_for_status()
         except httpx.HTTPError as error:
             raise SemanticExtractionError(_gemini_http_error("extraction", error)) from error
 
@@ -110,6 +168,8 @@ class GeminiEmbeddingProvider:
         dimension: int = 768,
         timeout_seconds: float = 60,
         concurrency: int = 5,
+        max_attempts: int = 3,
+        retry_base_seconds: float = 0.5,
     ) -> None:
         self._client = client
         self._api_key = api_key
@@ -117,6 +177,8 @@ class GeminiEmbeddingProvider:
         self.dimension = dimension
         self._timeout_seconds = timeout_seconds
         self._semaphore = asyncio.Semaphore(concurrency)
+        self._max_attempts = max_attempts
+        self._retry_base_seconds = retry_base_seconds
 
     async def embed(self, chunks: tuple[ExtractionChunk, ...]) -> tuple[ChunkVector, ...]:
         return tuple(await asyncio.gather(*(self._embed_one(chunk) for chunk in chunks)))
@@ -131,17 +193,20 @@ class GeminiEmbeddingProvider:
     async def _embed_text(self, text: str, *, task_type: str) -> tuple[float, ...]:
         async with self._semaphore:
             try:
-                response = await self._client.post(
-                    f"{GEMINI_API_BASE_URL}/models/{self.model_name}:embedContent",
-                    headers={"x-goog-api-key": self._api_key},
-                    json={
+                response = await _post_with_retry(
+                    self._client,
+                    url=f"{GEMINI_API_BASE_URL}/models/{self.model_name}:embedContent",
+                    api_key=self._api_key,
+                    payload={
                         "content": {"parts": [{"text": text}]},
                         "taskType": task_type,
                         "outputDimensionality": self.dimension,
                     },
-                    timeout=self._timeout_seconds,
+                    timeout_seconds=self._timeout_seconds,
+                    operation="embedding",
+                    max_attempts=self._max_attempts,
+                    retry_base_seconds=self._retry_base_seconds,
                 )
-                response.raise_for_status()
             except httpx.HTTPError as error:
                 raise EmbeddingProviderError(_gemini_http_error("embedding", error)) from error
         try:
@@ -174,11 +239,15 @@ class GeminiAnswerGenerator:
         api_key: str,
         model_name: str = "gemini-3.6-flash",
         timeout_seconds: float = 120,
+        max_attempts: int = 3,
+        retry_base_seconds: float = 0.5,
     ) -> None:
         self._client = client
         self._api_key = api_key
         self.model_name = model_name
         self._timeout_seconds = timeout_seconds
+        self._max_attempts = max_attempts
+        self._retry_base_seconds = retry_base_seconds
 
     async def generate(
         self,
@@ -211,13 +280,16 @@ class GeminiAnswerGenerator:
             },
         }
         try:
-            response = await self._client.post(
-                f"{GEMINI_API_BASE_URL}/models/{self.model_name}:generateContent",
-                headers={"x-goog-api-key": self._api_key},
-                json=payload,
-                timeout=self._timeout_seconds,
+            response = await _post_with_retry(
+                self._client,
+                url=f"{GEMINI_API_BASE_URL}/models/{self.model_name}:generateContent",
+                api_key=self._api_key,
+                payload=payload,
+                timeout_seconds=self._timeout_seconds,
+                operation="answer_generation",
+                max_attempts=self._max_attempts,
+                retry_base_seconds=self._retry_base_seconds,
             )
-            response.raise_for_status()
         except httpx.HTTPError as error:
             raise AnswerGeneratorError(_gemini_http_error("answer generation", error)) from error
 

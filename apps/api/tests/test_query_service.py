@@ -32,15 +32,23 @@ class FakeQueryRepository:
         self.structured = structured
         self.saved: QueryResult | None = None
         self.semantic_request: dict[str, object] = {}
+        self.keyword_document_id: UUID | None = None
+        self.structured_document_id: UUID | None = None
 
-    async def search_keyword(self, query: str, *, limit: int):  # type: ignore[no-untyped-def]
+    async def search_keyword(  # type: ignore[no-untyped-def]
+        self, query: str, *, document_id: UUID | None, limit: int
+    ):
+        self.keyword_document_id = document_id
         return self.keyword
 
     async def search_semantic(self, vector, **kwargs):  # type: ignore[no-untyped-def]
         self.semantic_request = {"vector": vector, **kwargs}
         return self.semantic
 
-    async def search_structured(self, query: str, *, limit: int):  # type: ignore[no-untyped-def]
+    async def search_structured(  # type: ignore[no-untyped-def]
+        self, query: str, *, document_id: UUID | None, limit: int
+    ):
+        self.structured_document_id = document_id
         return self.structured
 
     async def save_query(self, result: QueryResult) -> None:
@@ -101,6 +109,21 @@ async def test_query_fuses_retrieval_and_persists_only_cited_sources() -> None:
     assert [source.chunk_id for source in result.sources] == [semantic_only]
     assert result.sources[0].citation_number == 2
     assert repository.semantic_request["dimension"] == 3
+    assert repository.saved == result
+
+
+@pytest.mark.asyncio
+async def test_document_scope_is_applied_to_every_retriever_and_history() -> None:
+    document_id = uuid4()
+    repository = FakeQueryRepository((), (), ())
+    service = CorpusQueryService(repository, FakeQueryEmbeddings(), FakeAnswerGenerator())
+
+    result = await service.query("What changed?", document_id=document_id)
+
+    assert repository.keyword_document_id == document_id
+    assert repository.semantic_request["document_id"] == document_id
+    assert repository.structured_document_id == document_id
+    assert result.document_id == document_id
     assert repository.saved == result
 
 

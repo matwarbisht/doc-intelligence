@@ -118,6 +118,7 @@ describe('document API client', () => {
           id: 'query-1',
           query: 'What changed?',
           query_type: 'hybrid',
+          document_id: null,
           answer: 'Revenue increased [1].',
           sources: [],
           created_at: '2026-09-05T00:00:00Z',
@@ -138,6 +139,39 @@ describe('document API client', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ query: 'What changed?' }),
+      }),
+    );
+  });
+
+  it('sends an optional document scope with a corpus query', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'query-2',
+          query: 'What changed?',
+          query_type: 'hybrid',
+          document_id: 'doc-1',
+          answer: 'Revenue increased [1].',
+          sources: [],
+          created_at: '2026-09-05T00:00:00Z',
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createDocumentApiClient('http://api.test').queryCorpus(
+      'What changed?',
+      { documentId: 'doc-1' },
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/query',
+      expect.objectContaining({
+        body: JSON.stringify({
+          query: 'What changed?',
+          document_id: 'doc-1',
+        }),
       }),
     );
   });

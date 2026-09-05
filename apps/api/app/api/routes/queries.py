@@ -19,7 +19,7 @@ async def query_corpus(
     service: QueryServiceDependency,
 ) -> CorpusQueryResponse:
     try:
-        result = await service.query(payload.query)
+        result = await service.query(payload.query, document_id=payload.document_id)
     except EmptyQueryError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
     except (QueryServiceError, AnswerGeneratorError, EmbeddingProviderError) as error:

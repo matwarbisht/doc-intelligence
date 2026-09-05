@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     gemini_embedding_dimension: int = Field(default=768, ge=128, le=3072)
     gemini_timeout_seconds: float = Field(default=120, gt=0)
     gemini_embedding_concurrency: int = Field(default=5, ge=1, le=20)
+    gemini_max_attempts: int = Field(default=3, ge=1, le=5)
+    gemini_retry_base_seconds: float = Field(default=0.5, ge=0, le=10)
     retrieval_candidate_limit: int = Field(default=10, ge=1, le=50)
     retrieval_max_sources: int = Field(default=8, ge=1, le=20)
 

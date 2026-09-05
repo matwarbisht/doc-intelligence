@@ -7,7 +7,12 @@ import httpx
 import pytest
 
 from app.domain import ExtractionChunk, RetrievalHit
-from app.providers import GeminiAnswerGenerator, GeminiEmbeddingProvider, GeminiSemanticExtractor
+from app.providers import (
+    AnswerGeneratorError,
+    GeminiAnswerGenerator,
+    GeminiEmbeddingProvider,
+    GeminiSemanticExtractor,
+)
 
 
 @pytest.mark.asyncio
@@ -127,3 +132,74 @@ async def test_gemini_answer_generator_validates_cited_evidence() -> None:
 
     assert result.answer == "Revenue grew by 24% [1]."
     assert result.citations[0].chunk_id == chunk_id
+
+
+@pytest.mark.asyncio
+async def test_gemini_answer_generator_retries_transient_failures() -> None:
+    chunk_id = uuid4()
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(503, request=request)
+        answer = {
+            "answer": "Revenue grew by 24% [1].",
+            "citations": [{"source_number": 1, "chunk_id": str(chunk_id)}],
+        }
+        return httpx.Response(
+            200,
+            json={"candidates": [{"content": {"parts": [{"text": json.dumps(answer)}]}}]},
+            request=request,
+        )
+
+    evidence = RetrievalHit(
+        chunk_id=chunk_id,
+        document_id=uuid4(),
+        filename="report.pdf",
+        content="Revenue grew by 24%.",
+        score=1,
+    )
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        generator = GeminiAnswerGenerator(
+            client,
+            api_key="test",
+            model_name="answer-test",
+            max_attempts=2,
+            retry_base_seconds=0,
+        )
+        result = await generator.generate("How much?", (evidence,))
+
+    assert calls == 2
+    assert result.answer == "Revenue grew by 24% [1]."
+
+
+@pytest.mark.asyncio
+async def test_gemini_answer_generator_does_not_retry_invalid_requests() -> None:
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(400, request=request)
+
+    evidence = RetrievalHit(
+        chunk_id=uuid4(),
+        document_id=uuid4(),
+        filename="report.pdf",
+        content="Revenue grew by 24%.",
+        score=1,
+    )
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        generator = GeminiAnswerGenerator(
+            client,
+            api_key="test",
+            model_name="answer-test",
+            max_attempts=3,
+            retry_base_seconds=0,
+        )
+        with pytest.raises(AnswerGeneratorError):
+            await generator.generate("How much?", (evidence,))
+
+    assert calls == 1

@@ -368,20 +368,28 @@ async def test_enrichment_persists_semantics_embeddings_and_ready_state() -> Non
             ).process_document(upload.document.id)
             detail = await documents.get_intelligence(upload.document.id)
             queries = PostgresQueryRepository(pool)
-            keyword_hits = await queries.search_keyword("provenance", limit=5)
+            keyword_hits = await queries.search_keyword(
+                "provenance", document_id=upload.document.id, limit=5
+            )
             semantic_hits = await queries.search_semantic(
                 (1.0,) + (0.0,) * 767,
                 provider="gemini",
                 model_name="integration-embedding",
                 dimension=768,
+                document_id=upload.document.id,
                 limit=5,
             )
-            structured_hits = await queries.search_structured("Canonical output", limit=5)
+            structured_hits = await queries.search_structured(
+                "Canonical output", document_id=upload.document.id, limit=5
+            )
             query_result = await CorpusQueryService(
                 queries,
                 IntegrationEmbeddings(),
                 IntegrationAnswerGenerator(),
-            ).query("What does the canonical output retain?")
+            ).query(
+                "What does the canonical output retain?",
+                document_id=upload.document.id,
+            )
             query_id = query_result.id
 
             assert result.document is not None and result.document.status == "ready"
@@ -397,9 +405,12 @@ async def test_enrichment_persists_semantics_embeddings_and_ready_state() -> Non
             assert structured_hits[0].document_id == upload.document.id
             assert query_result.answer == "The canonical output retains provenance [1]."
             assert query_result.sources[0].document_id == upload.document.id
+            assert query_result.document_id == upload.document.id
             assert (
                 await pool.fetchval(
-                    "select count(*) from public.queries where id=$1", query_result.id
+                    "select count(*) from public.queries where id=$1 and document_id=$2",
+                    query_result.id,
+                    upload.document.id,
                 )
                 == 1
             )

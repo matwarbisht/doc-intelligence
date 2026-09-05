@@ -95,6 +95,9 @@ it('renders semantic intelligence with cited source text', async () => {
   expect(screen.getByText('Revenue grew during the quarter.')).toBeVisible();
   expect(screen.getByText('Revenue grew by 24%.')).toBeVisible();
   expect(screen.getByText('Page 2')).toBeVisible();
+  expect(
+    screen.getByRole('link', { name: 'Ask about this document' }),
+  ).toHaveAttribute('href', '/ask?document=doc-1');
 });
 
 it('offers retry recovery for a failed processing stage', async () => {

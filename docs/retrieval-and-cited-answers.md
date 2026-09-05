@@ -19,7 +19,16 @@ question
        validated citations + source excerpts
 ```
 
-`POST /api/v1/query` accepts a question of up to 2,000 characters. Only chunks from the latest version of documents whose status is `ready` are eligible for retrieval.
+`POST /api/v1/query` accepts a question of up to 2,000 characters and an optional
+`document_id`. Only chunks from the latest version of documents whose status is
+`ready` are eligible. When `document_id` is present, every retrieval branch filters
+to that document before ranking; it is not merely a frontend hint.
+
+The `/ask` screen defaults to the complete corpus and exposes ready documents in an
+answer-scope selector. Its selection is encoded as `/ask?document=<document-id>`.
+Ready document-detail pages link to that URL, providing a document-level entry point
+without introducing a separate question-answering interface. Selecting “All documents”
+or using “Clear scope” removes the URL parameter and returns to global retrieval.
 
 ## Hybrid retrieval
 
@@ -43,7 +52,9 @@ The adapter rejects source-number/chunk-ID mismatches. The API returns only sour
 
 `QueryRepository` owns keyword, vector, structured retrieval, and query-history persistence. `AnswerGenerator` owns the grounded-answer provider boundary. `EmbeddingProvider.embed_query` distinguishes query embeddings from the `RETRIEVAL_DOCUMENT` embeddings created during ingestion.
 
-Completed queries are written to `public.queries` with the `hybrid` query type, answer, and cited source metadata. Raw provider payloads and credentials are never persisted or returned.
+Completed queries are written to `public.queries` with the `hybrid` query type,
+optional document scope, answer, and cited source metadata. Raw provider payloads
+and credentials are never persisted or returned.
 
 ## Configuration
 
@@ -54,3 +65,8 @@ RETRIEVAL_MAX_SOURCES=8
 ```
 
 The query service also requires `GEMINI_API_KEY`, `GEMINI_EMBEDDING_MODEL`, and `GEMINI_EMBEDDING_DIMENSION`. The answer and extraction models are configured separately so they can be evaluated and upgraded independently later.
+
+Gemini requests retry transient network failures and HTTP 429/5xx responses up to
+`GEMINI_MAX_ATTEMPTS` times with exponential delay starting at
+`GEMINI_RETRY_BASE_SECONDS`. Invalid requests and other non-transient 4xx responses
+fail immediately.

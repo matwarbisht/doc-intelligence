@@ -61,6 +61,14 @@ export function DocumentDetailPage() {
           <span className={styles.status} data-status={detail.status}>
             {detail.status.replaceAll('_', ' ')}
           </span>
+          {detail.status === 'ready' ? (
+            <Link
+              className={styles.askLink}
+              to={`/ask?document=${encodeURIComponent(detail.id)}`}
+            >
+              Ask about this document
+            </Link>
+          ) : null}
           {isFailed(detail.status) ? (
             <Button
               variant="secondary"

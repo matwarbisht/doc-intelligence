@@ -400,6 +400,7 @@ class QueryResult(DomainModel):
     id: UUID
     query: Annotated[str, Field(min_length=1)]
     query_type: QueryType
+    document_id: UUID | None = None
     answer: Annotated[str, Field(min_length=1)]
     sources: tuple[RetrievalHit, ...] = ()
     created_at: datetime

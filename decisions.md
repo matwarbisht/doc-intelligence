@@ -293,3 +293,23 @@ New decisions should be appended when a choice meaningfully affects architecture
 **The reasoning** — The existing pipeline already knows which durable stages succeeded and atomically claims retryable work. A user-triggered retry supplies immediate recovery without hiding repeated provider or configuration failures and without introducing another runtime service before deployment needs are known.
 
 **What we deliberately cut** — Backoff schedules, automatic retry policy by error class, dead-letter administration, and bulk retries. Those become important when processing no longer has an attentive MVP operator.
+
+## D030 — Model document-level questions as an optional retrieval scope
+
+**The decision** — Keep one `/ask` experience and one query endpoint, with an optional document UUID that is applied to keyword, semantic, and structured retrieval before fusion. Store the selection in the `document` URL query parameter and persist it with query history.
+
+**The alternatives** — Build a separate document-chat screen and endpoint; filter globally retrieved results in the browser; inject the filename into the natural-language question; or maintain the selection only in React state.
+
+**The reasoning** — Global and document-level questions share retrieval, grounding, citations, and presentation; only the eligible evidence set changes. A backend constraint guarantees that unrelated evidence cannot leak into a scoped answer. A query parameter makes the state refreshable, bookmarkable, and suitable for the document-detail entry point without creating duplicate routes or interfaces.
+
+**What we deliberately cut** — Multi-document manual selection, saved scopes, folders, conversational threads, and document comparison mode. Those require additional selection and history semantics; the MVP enhancement needs only “all documents” or exactly one ready document.
+
+## D031 — Retry only transient Gemini failures at the provider boundary
+
+**The decision** — Retry Gemini network errors and HTTP 429, 500, 502, 503, and 504 responses with configurable bounded attempts and exponential delay. Apply the policy consistently to answer generation, extraction, and embeddings; fail non-transient HTTP errors immediately.
+
+**The alternatives** — Surface every provider failure immediately; retry all errors indiscriminately; retry the whole query service including retrieval and persistence; or add a general-purpose resilience library.
+
+**The reasoning** — The first scoped-query test completed retrieval but Gemini briefly returned 503, while a later request succeeded. Retrying at the adapter boundary repeats only the failed external call, avoids duplicating query records or database work, and contains provider-specific policy. Bounded attempts prevent an outage or quota condition from hanging requests indefinitely.
+
+**What we deliberately cut** — Circuit breakers, jitter, `Retry-After` parsing, cross-request retry queues, and provider fallback. Those are useful at higher traffic but add operational policy that the local MVP does not yet need.

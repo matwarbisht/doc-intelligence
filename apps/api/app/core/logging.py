@@ -24,6 +24,10 @@ _EXTRA_FIELDS = (
     "semantic_hits",
     "structured_hits",
     "fused_hits",
+    "scope_document_id",
+    "provider",
+    "operation",
+    "attempt",
 )
 
 
