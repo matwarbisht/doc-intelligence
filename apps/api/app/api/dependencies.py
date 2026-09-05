@@ -6,8 +6,7 @@ from fastapi import HTTPException, Request, status
 
 from app.services import (
     CorpusQueryService,
-    DocumentPipelineService,
-    DocumentProcessingService,
+    DocumentProcessor,
     DocumentService,
 )
 
@@ -24,9 +23,9 @@ def get_document_service(request: Request) -> DocumentService:
 
 def get_processing_service(
     request: Request,
-) -> DocumentProcessingService | DocumentPipelineService:
+) -> DocumentProcessor:
     service = cast(
-        DocumentProcessingService | DocumentPipelineService | None,
+        DocumentProcessor | None,
         getattr(request.app.state, "processing_service", None),
     )
     if service is None:

@@ -84,3 +84,16 @@ Phase 2 is complete when a fresh checkout can start Supabase, rebuild the schema
 - Enforce the optional document scope in keyword, semantic, and structured retrieval
   before fusion and answer generation.
 - Retain the selected document ID in query history for diagnostics and evaluation.
+
+## Phase 9 — Enhancement: bulk document ingestion (complete)
+
+- Replace the native single-file input with a styled, accessible drag-and-drop surface.
+- Accept multiple supported documents through drag-and-drop or the file picker.
+- Show a persistent per-file queue with pending, uploading, uploaded, duplicate, and
+  failed states.
+- Preserve partial success and let users retry failures or clear completed items.
+- Reuse the existing single-document API with three concurrent browser uploads.
+- Bound complete backend processing pipelines with configurable shared concurrency so
+  bulk ingestion cannot fan out unlimited provider work.
+- Serialize Unstructured jobs independently, retry transient provider throttling, and
+  keep document-detail polling active while an accepted retry waits for capacity.

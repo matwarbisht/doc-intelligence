@@ -226,7 +226,7 @@ make format
 make check
 ```
 
-`make dev` delegates to `scripts/dev.sh`. The launcher finds pnpm and uv, starts the React and FastAPI processes together, prints their local URLs, and stops both when `Ctrl+C` is pressed.
+`make dev` delegates to `scripts/dev.sh`. The launcher finds pnpm and uv, verifies that the expected ports are free, starts the React and FastAPI processes together, and prints their local URLs. It uses separate process groups so `Ctrl+C` stops reloaders and their children, and it stops the sibling application if either server exits instead of leaving a misleading partial development stack running.
 
 ### Lockfiles
 

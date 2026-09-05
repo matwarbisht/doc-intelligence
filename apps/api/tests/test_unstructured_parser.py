@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 import httpx
@@ -122,3 +123,94 @@ async def test_unstructured_parser_hides_provider_response_details() -> None:
             )
 
     assert "provider detail" not in str(caught.value)
+
+
+@pytest.mark.asyncio
+async def test_unstructured_parser_retries_transient_throttling() -> None:
+    create_attempts = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal create_attempts
+        if request.method == "POST":
+            create_attempts += 1
+            if create_attempts == 1:
+                return httpx.Response(429)
+            return httpx.Response(
+                200,
+                json={
+                    "id": "job-1",
+                    "status": "COMPLETED",
+                    "output_node_files": [
+                        {
+                            "node_id": "partition-node",
+                            "file_id": "output.json",
+                            "node_type": "partition",
+                        }
+                    ],
+                },
+            )
+        return httpx.Response(
+            200,
+            json=[{"type": "Text", "element_id": "text-1", "text": "Recovered"}],
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        parser = UnstructuredDocumentParser(
+            client,
+            api_url="https://parser.example.test/api/v1",
+            api_key="test-key",
+            retry_base_seconds=0,
+        )
+        parsed = await parser.parse(
+            filename="report.pdf",
+            content_type="application/pdf",
+            content=b"pdf",
+        )
+
+    assert create_attempts == 2
+    assert parsed.elements[0].text == "Recovered"
+
+
+@pytest.mark.asyncio
+async def test_unstructured_parser_serializes_complete_jobs_by_default() -> None:
+    active_requests = 0
+    maximum_active_requests = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal active_requests, maximum_active_requests
+        active_requests += 1
+        maximum_active_requests = max(maximum_active_requests, active_requests)
+        await asyncio.sleep(0.01)
+        active_requests -= 1
+        if request.method == "POST":
+            return httpx.Response(
+                200,
+                json={
+                    "id": "job-1",
+                    "status": "COMPLETED",
+                    "output_node_files": [
+                        {
+                            "node_id": "partition-node",
+                            "file_id": "output.json",
+                            "node_type": "partition",
+                        }
+                    ],
+                },
+            )
+        return httpx.Response(
+            200,
+            json=[{"type": "Text", "element_id": "text-1", "text": "Parsed"}],
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        parser = UnstructuredDocumentParser(
+            client,
+            api_url="https://parser.example.test/api/v1",
+            api_key="test-key",
+        )
+        await asyncio.gather(
+            parser.parse(filename="one.pdf", content_type="application/pdf", content=b"one"),
+            parser.parse(filename="two.pdf", content_type="application/pdf", content=b"two"),
+        )
+
+    assert maximum_active_requests == 1

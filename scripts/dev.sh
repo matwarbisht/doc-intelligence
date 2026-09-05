@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+# Give each background job its own process group so reloaders and package-manager
+# children can be stopped together.
+set -m
+
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Volta requires this flag before its pnpm shim becomes available.
@@ -25,9 +29,32 @@ else
   exit 1
 fi
 
+check_port() {
+  local port="$1"
+  local service="$2"
+  if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null; then
+    echo "${service} could not start because port ${port} is already in use." >&2
+    echo "Inspect it with: lsof -nP -iTCP:${port} -sTCP:LISTEN" >&2
+    echo "Stop the owning process, then run make dev-local again." >&2
+    exit 1
+  fi
+}
+
+stop_group() {
+  local pid="${1:-}"
+  [[ -n "${pid}" ]] || return 0
+  kill -TERM -- "-${pid}" 2>/dev/null || return 0
+  for _ in {1..20}; do
+    kill -0 -- "-${pid}" 2>/dev/null || return 0
+    sleep 0.1
+  done
+  kill -KILL -- "-${pid}" 2>/dev/null || true
+}
+
 cleanup() {
   trap - EXIT INT TERM
-  kill "${api_pid:-}" "${web_pid:-}" 2>/dev/null || true
+  stop_group "${api_pid:-}"
+  stop_group "${web_pid:-}"
   wait "${api_pid:-}" "${web_pid:-}" 2>/dev/null || true
 }
 
@@ -38,6 +65,9 @@ shutdown() {
 
 trap cleanup EXIT
 trap shutdown INT TERM
+
+check_port 8000 "API"
+check_port 5173 "Frontend"
 
 echo "Starting Document Intelligence"
 echo "  Frontend: http://localhost:5173"
@@ -55,8 +85,20 @@ api_pid=$!
 
 (
   cd "${project_root}"
-  "${pnpm_command[@]}" --filter @doc-intelligence/web dev --host 127.0.0.1
+  "${pnpm_command[@]}" --filter @doc-intelligence/web dev --host 127.0.0.1 --strictPort
 ) &
 web_pid=$!
 
-wait "${api_pid}" "${web_pid}"
+while kill -0 "${api_pid}" 2>/dev/null && kill -0 "${web_pid}" 2>/dev/null; do
+  sleep 0.5
+done
+
+if ! kill -0 "${api_pid}" 2>/dev/null; then
+  wait "${api_pid}" || exit_code=$?
+  echo "API server exited; stopping the frontend." >&2
+else
+  wait "${web_pid}" || exit_code=$?
+  echo "Frontend server exited; stopping the API." >&2
+fi
+
+exit "${exit_code:-1}"

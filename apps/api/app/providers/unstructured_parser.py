@@ -29,6 +29,9 @@ class UnstructuredDocumentParser:
         template_id: str = "hi_res_partition",
         timeout_seconds: float = 300,
         poll_interval_seconds: float = 2,
+        concurrency: int = 1,
+        max_attempts: int = 3,
+        retry_base_seconds: float = 1,
     ) -> None:
         self._client = client
         self._api_url = api_url.rstrip("/")
@@ -36,6 +39,9 @@ class UnstructuredDocumentParser:
         self._template_id = template_id
         self._timeout_seconds = timeout_seconds
         self._poll_interval_seconds = poll_interval_seconds
+        self._semaphore = asyncio.Semaphore(concurrency)
+        self._max_attempts = max_attempts
+        self._retry_base_seconds = retry_base_seconds
 
     async def parse(
         self,
@@ -46,13 +52,14 @@ class UnstructuredDocumentParser:
     ) -> ParsedDocument:
         try:
             async with asyncio.timeout(self._timeout_seconds):
-                job = await self._create_job(
-                    filename=filename,
-                    content_type=content_type,
-                    content=content,
-                )
-                completed_job = await self._wait_for_job(job)
-                payload = await self._download_output(completed_job)
+                async with self._semaphore:
+                    job = await self._create_job(
+                        filename=filename,
+                        content_type=content_type,
+                        content=content,
+                    )
+                    completed_job = await self._wait_for_job(job)
+                    payload = await self._download_output(completed_job)
         except TimeoutError as error:
             raise DocumentParserError("Unstructured parsing timed out.") from error
 
@@ -144,27 +151,34 @@ class UnstructuredDocumentParser:
         files: list[tuple[str, tuple[str, bytes, str]]] | None = None,
         params: dict[str, str] | None = None,
     ) -> httpx.Response:
-        try:
-            response = await self._client.request(
-                method,
-                f"{self._api_url}{path}",
-                headers={
-                    "accept": "application/json",
-                    "unstructured-api-key": self._api_key,
-                },
-                follow_redirects=True,
-                data=data,
-                files=files,
-                params=params,
-            )
-            response.raise_for_status()
-            return response
-        except httpx.HTTPError as error:
-            status = (
-                error.response.status_code if isinstance(error, httpx.HTTPStatusError) else None
-            )
-            detail = f" with status {status}" if status is not None else ""
-            raise DocumentParserError(f"Unstructured request failed{detail}.") from error
+        for attempt in range(1, self._max_attempts + 1):
+            try:
+                response = await self._client.request(
+                    method,
+                    f"{self._api_url}{path}",
+                    headers={
+                        "accept": "application/json",
+                        "unstructured-api-key": self._api_key,
+                    },
+                    follow_redirects=True,
+                    data=data,
+                    files=files,
+                    params=params,
+                )
+                response.raise_for_status()
+                return response
+            except httpx.HTTPError as error:
+                status = (
+                    error.response.status_code if isinstance(error, httpx.HTTPStatusError) else None
+                )
+                transient = status is None or status in {429, 500, 502, 503, 504}
+                if transient and attempt < self._max_attempts:
+                    await asyncio.sleep(self._retry_base_seconds * (2 ** (attempt - 1)))
+                    continue
+                detail = f" with status {status}" if status is not None else ""
+                raise DocumentParserError(f"Unstructured request failed{detail}.") from error
+
+        raise AssertionError("Unstructured retry loop ended unexpectedly")
 
     @staticmethod
     def _json_object(response: httpx.Response) -> Mapping[object, object]:

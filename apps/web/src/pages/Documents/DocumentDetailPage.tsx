@@ -4,7 +4,7 @@ import {
   type DocumentStatus,
 } from '@doc-intelligence/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 
 import { Card } from '../../components/Card/Card';
@@ -18,21 +18,42 @@ const api = createDocumentApiClient(
 export function DocumentDetailPage() {
   const { documentId = '' } = useParams();
   const queryClient = useQueryClient();
+  const [retryAttemptBaseline, setRetryAttemptBaseline] = useState<
+    number | null
+  >(null);
   const document = useQuery({
     queryKey: ['documents', documentId],
     queryFn: ({ signal }) => api.getDocument(documentId, { signal }),
     enabled: Boolean(documentId),
     refetchInterval: (query) =>
-      query.state.data && isProcessing(query.state.data.status) ? 2_000 : false,
+      query.state.data &&
+      (isProcessing(query.state.data.status) || retryAttemptBaseline !== null)
+        ? 2_000
+        : false,
   });
   const retry = useMutation({
     mutationFn: () => api.processDocument(documentId),
+    onMutate: () => {
+      setRetryAttemptBaseline(totalAttempts(document.data?.processing ?? []));
+    },
+    onError: () => setRetryAttemptBaseline(null),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: ['documents', documentId],
       });
     },
   });
+
+  useEffect(() => {
+    if (
+      retryAttemptBaseline !== null &&
+      document.data &&
+      !isProcessing(document.data.status) &&
+      totalAttempts(document.data.processing) > retryAttemptBaseline
+    ) {
+      setRetryAttemptBaseline(null);
+    }
+  }, [document.data, retryAttemptBaseline]);
 
   if (document.isPending)
     return <p className={styles.state}>Loading document…</p>;
@@ -73,9 +94,11 @@ export function DocumentDetailPage() {
             <Button
               variant="secondary"
               onClick={() => retry.mutate()}
-              disabled={retry.isPending}
+              disabled={retry.isPending || retryAttemptBaseline !== null}
             >
-              {retry.isPending ? 'Retrying…' : 'Retry processing'}
+              {retry.isPending || retryAttemptBaseline !== null
+                ? 'Retry queued…'
+                : 'Retry processing'}
             </Button>
           ) : null}
         </div>
@@ -240,4 +263,8 @@ function isProcessing(status: DocumentStatus): boolean {
 
 function isFailed(status: DocumentStatus): boolean {
   return status.endsWith('_failed');
+}
+
+function totalAttempts(processing: { attempts: number }[]): number {
+  return processing.reduce((total, job) => total + job.attempts, 0);
 }

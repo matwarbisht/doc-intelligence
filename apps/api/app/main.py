@@ -23,10 +23,12 @@ from app.repositories import (
     PostgresQueryRepository,
 )
 from app.services import (
+    BoundedDocumentProcessor,
     CorpusQueryService,
     DocumentEnrichmentService,
     DocumentPipelineService,
     DocumentProcessingService,
+    DocumentProcessor,
     DocumentService,
 )
 
@@ -88,6 +90,9 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
                     template_id=settings.unstructured_template_id,
                     timeout_seconds=settings.unstructured_timeout_seconds,
                     poll_interval_seconds=settings.unstructured_poll_interval_seconds,
+                    concurrency=settings.unstructured_concurrency,
+                    max_attempts=settings.unstructured_max_attempts,
+                    retry_base_seconds=settings.unstructured_retry_base_seconds,
                 )
                 parsing_service = DocumentProcessingService(
                     PostgresProcessingRepository(pool),
@@ -97,7 +102,7 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
                     stale_after_seconds=settings.processing_stale_after_seconds,
                     max_chunk_characters=settings.max_chunk_characters,
                 )
-                application.state.processing_service = parsing_service
+                processor: DocumentProcessor = parsing_service
                 if settings.gemini_api_key and embedding_provider is not None:
                     enrichment_service = DocumentEnrichmentService(
                         PostgresEnrichmentRepository(pool),
@@ -115,10 +120,14 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
                         max_extraction_chunks=settings.max_extraction_chunks,
                         max_extraction_characters=settings.max_extraction_characters,
                     )
-                    application.state.processing_service = DocumentPipelineService(
+                    processor = DocumentPipelineService(
                         parsing_service,
                         enrichment_service,
                     )
+                application.state.processing_service = BoundedDocumentProcessor(
+                    processor,
+                    max_concurrency=settings.processing_concurrency,
+                )
             try:
                 yield
             finally:

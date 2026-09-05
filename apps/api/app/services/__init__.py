@@ -9,7 +9,11 @@ from app.services.document_service import (
     UnsupportedDocumentTypeError,
 )
 from app.services.enrichment_service import DocumentEnrichmentService, EnrichmentResult
-from app.services.pipeline_service import DocumentPipelineService
+from app.services.pipeline_service import (
+    BoundedDocumentProcessor,
+    DocumentPipelineService,
+    DocumentProcessor,
+)
 from app.services.processing_service import (
     DocumentProcessingService,
     ProcessingError,
@@ -19,10 +23,12 @@ from app.services.query_service import CorpusQueryService, EmptyQueryError, Quer
 
 __all__ = [
     "CorpusQueryService",
+    "BoundedDocumentProcessor",
     "DocumentService",
     "DocumentProcessingService",
     "DocumentEnrichmentService",
     "DocumentPipelineService",
+    "DocumentProcessor",
     "DocumentUpload",
     "DocumentUploadError",
     "EmptyDocumentError",

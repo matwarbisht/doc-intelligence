@@ -27,8 +27,7 @@ from app.schemas.documents import (
     DocumentUploadResponse,
 )
 from app.services import (
-    DocumentPipelineService,
-    DocumentProcessingService,
+    DocumentProcessor,
     DocumentService,
     DocumentUploadError,
     EmptyDocumentError,
@@ -39,7 +38,7 @@ from app.services import (
 router = APIRouter(prefix="/documents")
 DocumentServiceDependency = Annotated[DocumentService, Depends(get_document_service)]
 ProcessingServiceDependency = Annotated[
-    DocumentProcessingService | DocumentPipelineService,
+    DocumentProcessor,
     Depends(get_processing_service),
 ]
 
@@ -89,7 +88,7 @@ async def upload_document(
         response.status_code = status.HTTP_200_OK
     else:
         processing_service = getattr(request.app.state, "processing_service", None)
-        if isinstance(processing_service, (DocumentProcessingService, DocumentPipelineService)):
+        if isinstance(processing_service, DocumentProcessor):
             background_tasks.add_task(
                 processing_service.process_document,
                 result.document.id,

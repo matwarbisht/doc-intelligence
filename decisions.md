@@ -313,3 +313,33 @@ New decisions should be appended when a choice meaningfully affects architecture
 **The reasoning** — The first scoped-query test completed retrieval but Gemini briefly returned 503, while a later request succeeded. Retrying at the adapter boundary repeats only the failed external call, avoids duplicating query records or database work, and contains provider-specific policy. Bounded attempts prevent an outage or quota condition from hanging requests indefinitely.
 
 **What we deliberately cut** — Circuit breakers, jitter, `Retry-After` parsing, cross-request retry queues, and provider fallback. Those are useful at higher traffic but add operational policy that the local MVP does not yet need.
+
+## D032 — Orchestrate bulk ingestion over the single-document API
+
+**The decision** — Add a drag-and-drop, multi-file queue in the browser while continuing to upload each file through `POST /documents`. Limit browser uploads to three at a time and wrap the shared backend processing pipeline in a configurable concurrency semaphore.
+
+**The alternatives** — Add one multipart bulk endpoint; accept an archive and unpack it on the server; start every selected upload and processing job simultaneously; or wait for a distributed queue before supporting batches.
+
+**The reasoning** — The existing endpoint already owns type and size validation, content-hash deduplication, private storage, cleanup, and durable job creation. One request per file preserves those guarantees and makes partial success natural: an invalid document does not roll back valid ones. Browser concurrency protects upload bandwidth, while the backend limit protects Unstructured and Gemini even when requests come from multiple tabs or users.
+
+**What we deliberately cut** — Atomic batches, folder hierarchy, archive ingestion, pause/resume, byte-level upload progress, resumable uploads, and a dedicated worker queue. They add server-side batch identity or transport machinery that is unnecessary for the current document sizes and MVP runtime.
+
+## D033 — Limit concurrency at the provider boundary and follow accepted retries
+
+**The decision** — Keep up to three application pipelines in flight, but serialize complete Unstructured parsing jobs with a separate configurable semaphore. Retry transient Unstructured network, 429, and selected 5xx failures at the adapter boundary. After a user retries a failed document, keep polling its detail record until a new processing attempt reaches a terminal state.
+
+**The alternatives** — Reduce every pipeline stage to one-at-a-time; make the browser upload files sequentially; treat provider throttling as a permanent parsing failure; continuously poll every document-detail page; or optimistically assume the first refresh after a retry will observe a running job.
+
+**The reasoning** — Local job records showed that the bulk failures were all Unstructured HTTP 429 responses while one accepted job continued normally. Limiting only the constrained provider preserves overlap between parsing and Gemini enrichment without exceeding that active-job limit. A bounded adapter retry absorbs short throttling windows without repeating database claims. Retry-aware polling closes the race where the API accepts background work before the worker acquires capacity and changes the stored failed status.
+
+**What we deliberately cut** — A durable external work queue, automatic recovery of already failed documents, provider-plan discovery, adaptive concurrency, bulk retry controls, and server-pushed status events. They are useful later, but explicit local limits and targeted polling solve the observed MVP failure without adding infrastructure.
+
+## D034 — Treat the local frontend and API as one supervised process group
+
+**The decision** — Check the fixed development ports before launching, place each server and its reload descendants in a separate process group, terminate those groups together, and stop the sibling application when either server exits.
+
+**The alternatives** — Keep relying on direct child PIDs; automatically kill any process occupying ports 5173 or 8000; run the services in separate terminals; or introduce a container orchestrator for application development.
+
+**The reasoning** — Uvicorn's reload process outlived the launcher long enough for a restart to fail with “address already in use”; after that old process exited, Vite remained available while no API was running. Process-group cleanup covers reload descendants, early port checks explain conflicts before a partial stack starts, and sibling supervision prevents a working UI shell from masking an API startup failure. Refusing to kill an unknown port owner avoids disrupting unrelated local work.
+
+**What we deliberately cut** — Automatic port reassignment, automatic termination of unknown processes, Docker Compose for the application services, and a general-purpose process supervisor. Fixed URLs and a small shell launcher remain appropriate for this local MVP.

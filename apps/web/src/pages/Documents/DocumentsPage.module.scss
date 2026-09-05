@@ -38,17 +38,30 @@
 
 .uploadCard {
   padding: var(--space-6);
+}
 
-  form {
-    display: grid;
-    grid-template-columns: minmax(12rem, 0.5fr) minmax(18rem, 1fr);
-    gap: var(--space-6);
+.dropzone {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 10rem;
+  padding: var(--space-8);
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border-hover);
+  border-radius: var(--radius-md);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+
+  &[data-dragging] {
+    background: var(--color-surface-active);
+    border-color: var(--color-primary);
   }
 
-  label {
-    display: block;
-    margin-bottom: var(--space-1);
-    font-weight: var(--font-weight-semibold);
+  h2 {
+    margin: 0 0 var(--space-1);
+    font-size: var(--font-size-lg);
   }
 
   p {
@@ -58,25 +71,121 @@
   }
 }
 
-.uploadControls {
+.dropMark {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: var(--space-3);
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  color: var(--color-primary-foreground);
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xl);
 }
 
-.selection,
-.notice,
-.error {
-  grid-column: 2;
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
-.uploadCard .selection {
+.filePicker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding-inline: var(--space-4);
+  color: var(--color-primary-foreground);
+  background: var(--color-primary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.filePicker:hover {
+  background: var(--color-primary-hover);
+}
+
+.fileInput:focus-visible ~ .filePicker {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.uploadQueue {
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border);
+}
+
+.queueHeader,
+.queueActions,
+.queueItem,
+.queueStatus {
+  display: flex;
+  align-items: center;
+}
+
+.queueHeader,
+.queueItem {
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.queueHeader h2 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+.queueActions,
+.queueStatus {
+  gap: var(--space-2);
+}
+
+.queueList {
+  display: grid;
+  margin-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.queueItem {
+  min-width: 0;
+  padding-block: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.queueItem > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.queueItem strong {
+  overflow: hidden;
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queueItem span {
   color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
 }
 
-.uploadCard .notice {
+.queueStatus[data-state='uploaded'] > span,
+.queueStatus[data-state='duplicate'] > span {
   color: var(--color-success-foreground);
+}
+
+.queueStatus[data-state='failed'] > span {
+  max-width: 28rem;
+  color: var(--color-danger);
+  text-align: right;
 }
 
 .error {
@@ -201,16 +310,17 @@
 }
 
 @media (max-width: 48rem) {
-  .pageHeader,
-  .uploadCard form {
+  .pageHeader {
     grid-template-columns: 1fr;
     gap: var(--space-6);
   }
 
-  .selection,
-  .notice,
-  .error {
-    grid-column: 1;
+  .dropzone {
+    grid-template-columns: auto 1fr;
+  }
+
+  .filePicker {
+    grid-column: 1 / -1;
   }
 }
 
@@ -220,8 +330,33 @@
     padding-top: var(--space-8);
   }
 
-  .uploadControls {
+  .uploadCard {
+    padding: var(--space-4);
+  }
+
+  .dropzone {
     grid-template-columns: 1fr;
+    padding: var(--space-6);
+    text-align: center;
+  }
+
+  .dropMark {
+    margin-inline: auto;
+  }
+
+  .queueHeader,
+  .queueItem {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .queueActions {
+    flex-wrap: wrap;
+  }
+
+  .queueStatus {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .documentRow {

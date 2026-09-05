@@ -35,7 +35,11 @@ class Settings(BaseSettings):
     unstructured_template_id: str = "hi_res_partition"
     unstructured_timeout_seconds: float = Field(default=300, gt=0)
     unstructured_poll_interval_seconds: float = Field(default=2, ge=0.1, le=30)
+    unstructured_concurrency: int = Field(default=1, ge=1, le=10)
+    unstructured_max_attempts: int = Field(default=3, ge=1, le=10)
+    unstructured_retry_base_seconds: float = Field(default=1, ge=0, le=30)
     processing_max_attempts: int = Field(default=3, ge=1, le=10)
+    processing_concurrency: int = Field(default=3, ge=1, le=20)
     processing_stale_after_seconds: int = Field(default=15 * 60, ge=60)
     max_chunk_characters: int = Field(default=2_000, ge=100)
     max_extraction_chunks: int = Field(default=250, ge=1, le=2_000)

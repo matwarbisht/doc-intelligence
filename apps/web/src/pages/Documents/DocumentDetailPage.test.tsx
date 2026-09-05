@@ -101,6 +101,8 @@ it('renders semantic intelligence with cited source text', async () => {
 });
 
 it('offers retry recovery for a failed processing stage', async () => {
+  let detailRequests = 0;
+  let retryAccepted = false;
   const detail = {
     id: 'doc-failed',
     filename: 'failed.pdf',
@@ -130,6 +132,7 @@ it('offers retry recovery for a failed processing stage', async () => {
     .fn()
     .mockImplementation((_url: string, init?: RequestInit) => {
       if (init?.method === 'POST') {
+        retryAccepted = true;
         return Promise.resolve(
           new Response(
             JSON.stringify({ document_id: 'doc-failed', accepted: true }),
@@ -140,11 +143,25 @@ it('offers retry recovery for a failed processing stage', async () => {
           ),
         );
       }
+      detailRequests += 1;
+      const retryCompleted = retryAccepted && detailRequests >= 3;
       return Promise.resolve(
-        new Response(JSON.stringify(detail), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
+        new Response(
+          JSON.stringify({
+            ...detail,
+            status: retryCompleted ? 'ready' : detail.status,
+            processing: detail.processing.map((job) => ({
+              ...job,
+              status: retryCompleted ? 'succeeded' : job.status,
+              attempts: retryCompleted ? 2 : job.attempts,
+              error: retryCompleted ? null : job.error,
+            })),
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          },
+        ),
       );
     });
   vi.stubGlobal('fetch', fetchMock);
@@ -175,4 +192,9 @@ it('offers retry recovery for a failed processing stage', async () => {
       expect.objectContaining({ method: 'POST' }),
     ),
   );
+  expect(screen.getByRole('button', { name: 'Retry queued…' })).toBeDisabled();
+  expect(
+    await screen.findByText('ready', {}, { timeout: 3_000 }),
+  ).toBeVisible();
+  expect(detailRequests).toBeGreaterThanOrEqual(3);
 });
