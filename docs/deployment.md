@@ -19,6 +19,16 @@ docker build \
 `VITE_API_URL` is compiled into the browser bundle. It must be the public API URL
 and must never contain a credential. Rebuild the web image when this URL changes.
 
+## Vercel frontend
+
+Configure the Vercel project's Root Directory as `apps/web`. The committed
+`apps/web/vercel.json` rewrites requests that do not resolve to static files to
+`/index.html`, allowing React Router to handle direct visits and browser refreshes
+for routes such as `/sign-in`, `/documents`, and `/style-guide`.
+
+This is an internal rewrite rather than a redirect: the requested URL remains in
+the address bar. A new deployment is required after changing the routing config.
+
 ## API environment
 
 Set these secrets and environment-specific values on the API service:
