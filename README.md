@@ -2,6 +2,40 @@
 
 A general-purpose document intelligence platform that turns heterogeneous documents into canonical elements, retrieval-ready chunks, semantic facts, and cited answers.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    User([User]) --> Web[React + TypeScript SPA]
+
+    Web -->|Email/password session| Auth[Supabase Auth]
+    Web -->|REST + bearer token| API[FastAPI API]
+    API -->|Validate session| Auth
+    API --> Guard[Authentication, ownership, quotas, and kill switches]
+
+    Guard --> Documents[Document services]
+    Guard --> Query[Hybrid query service]
+
+    Documents --> Storage[(Private Supabase Storage)]
+    Documents --> Pipeline[Durable processing pipeline]
+    Pipeline --> Parser[Unstructured parser]
+    Pipeline --> Extraction[Gemini extraction]
+    Pipeline --> Embeddings[Gemini embeddings]
+    Pipeline --> Database[(Supabase Postgres + pgvector)]
+
+    Query --> Database
+    Query --> Embeddings
+    Query --> Answers[Gemini grounded answers]
+
+    Database -->|Documents, status, intelligence, and citations| API
+```
+
+The API is the security and application boundary: provider credentials stay on the backend,
+documents are scoped to their owners, and expensive work passes through configurable quotas
+and kill switches. Processing moves durably through `QUEUED → PARSING → EXTRACTING →
+EMBEDDING → INDEXING → READY`, with stage-specific failures available for retry. See the
+[architecture documentation](docs/architecture.md) for the dependency boundaries.
+
 ## Repository
 
 - `apps/web` — React, TypeScript, and Vite frontend
